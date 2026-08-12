@@ -1,0 +1,23 @@
+[package]
+name = "alternate-codec"
+version = "0.0.0-canary"
+edition = "2024"
+
+[dependencies]
+postcard = { version = "1.1.3", default-features = false, features = ["use-std"], optional = true }
+rmp-serde = { version = "1.3.1", optional = true }
+serde.workspace = true
+serde_json = { version = "1.0.150", optional = true }
+thiserror.workspace = true
+tracing = { workspace = true, optional = true }
+
+[features]
+default = ["tracing"]
+binary = ["dep:postcard"]
+json = ["dep:serde_json"]
+msgpack = ["dep:rmp-serde"]
+tracing = ["dep:tracing"]
+
+[lints]
+workspace = true
+

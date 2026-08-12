@@ -1,8 +1,11 @@
 [workspace]
 resolver = "3"
-members = []
+members = ["crates/codec"]
 
 [workspace.dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+thiserror = "2.0.20"
+tracing = "0.1.44"
 
 [workspace.lints.clippy]
 pedantic = "warn"
