@@ -24,7 +24,6 @@
       {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            git
             (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
           ];
         };
