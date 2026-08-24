@@ -25,25 +25,43 @@ impl<S, R, A> Policy<S, R, A> for Deny {
     }
 }
 
-pub struct All<S, R, A> {
-    policies: Vec<Box<dyn Policy<S, R, A>>>,
-}
+pub struct All<P>(Vec<P>);
 
-impl<S, R, A> All<S, R, A> {
+impl<P> All<P> {
+    pub const fn new() -> Self {
+        Self(Vec::new())
+    }
+
     #[must_use]
-    pub fn new(policies: Vec<Box<dyn Policy<S, R, A>>>) -> Self {
-        Self { policies }
+    pub fn with_policy(mut self, policy: P) -> Self {
+        self.0.push(policy);
+        self
     }
 }
 
-impl<S, R, A> Policy<S, R, A> for All<S, R, A> {
+impl<P> FromIterator<P> for All<P> {
+    fn from_iter<T: IntoIterator<Item = P>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl<P> Default for All<P> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<S, R, A, P> Policy<S, R, A> for All<P>
+where
+    P: Policy<S, R, A>,
+{
     fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
-        if self.policies.is_empty() {
+        if self.0.is_empty() {
             return PolicyDecision::Deny;
         }
 
         if self
-            .policies
+            .0
             .iter()
             .all(|policy| policy.evaluate(subject, resource, action) == PolicyDecision::Allow)
         {
@@ -54,21 +72,39 @@ impl<S, R, A> Policy<S, R, A> for All<S, R, A> {
     }
 }
 
-pub struct Any<S, R, A> {
-    policies: Vec<Box<dyn Policy<S, R, A>>>,
-}
+pub struct Any<P>(Vec<P>);
 
-impl<S, R, A> Any<S, R, A> {
+impl<P> Any<P> {
+    pub const fn new() -> Self {
+        Self(Vec::new())
+    }
+
     #[must_use]
-    pub fn new(policies: Vec<Box<dyn Policy<S, R, A>>>) -> Self {
-        Self { policies }
+    pub fn with_policy(mut self, policy: P) -> Self {
+        self.0.push(policy);
+        self
     }
 }
 
-impl<S, R, A> Policy<S, R, A> for Any<S, R, A> {
+impl<P> FromIterator<P> for Any<P> {
+    fn from_iter<T: IntoIterator<Item = P>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl<P> Default for Any<P> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<S, R, A, P> Policy<S, R, A> for Any<P>
+where
+    P: Policy<S, R, A>,
+{
     fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
         if self
-            .policies
+            .0
             .iter()
             .any(|policy| policy.evaluate(subject, resource, action) == PolicyDecision::Allow)
         {
