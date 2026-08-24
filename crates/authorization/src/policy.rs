@@ -13,9 +13,9 @@ pub enum PolicyDecision {
 impl PolicyDecision {
     fn and(self, other: Self) -> Self {
         match (self, other) {
-            (Self::Deny, _) | (_, Self::Deny) => Self::Deny,
             (Self::Permit, Self::Permit) => Self::Permit,
-            _ => Self::NotApplicable,
+            (Self::Deny, _) | (_, Self::Deny) => Self::Deny,
+            (Self::NotApplicable, d) | (d, Self::NotApplicable) => d,
         }
     }
 
@@ -23,7 +23,7 @@ impl PolicyDecision {
         match (self, other) {
             (Self::Permit, _) | (_, Self::Permit) => Self::Permit,
             (Self::Deny, Self::Deny) => Self::Deny,
-            _ => Self::NotApplicable,
+            (Self::NotApplicable, d) | (d, Self::NotApplicable) => d,
         }
     }
 
@@ -146,11 +146,8 @@ where
     P: Policy<S, R, A>,
 {
     fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
-        if self.0.is_empty() {
-            return PolicyDecision::NotApplicable;
-        }
+        let mut decision = PolicyDecision::NotApplicable;
 
-        let mut decision = PolicyDecision::Permit;
         for policy in &self.0 {
             decision = decision.and(policy.evaluate(subject, resource, action));
             if decision == PolicyDecision::Deny {
@@ -193,11 +190,8 @@ where
     P: Policy<S, R, A>,
 {
     fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
-        if self.0.is_empty() {
-            return PolicyDecision::NotApplicable;
-        }
+        let mut decision = PolicyDecision::NotApplicable;
 
-        let mut decision = PolicyDecision::Deny;
         for policy in &self.0 {
             decision = decision.or(policy.evaluate(subject, resource, action));
             if decision == PolicyDecision::Permit {
