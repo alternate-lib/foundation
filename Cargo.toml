@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/codec"]
+members = ["crates/authorization", "crates/codec"]
 
 [workspace.dependencies]
 serde = { version = "1.0.229", features = ["derive"] }
