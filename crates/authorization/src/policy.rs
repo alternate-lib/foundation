@@ -25,6 +25,96 @@ impl<S, R, A> Policy<S, R, A> for Deny {
     }
 }
 
+impl PolicyDecision {
+    fn and(self, other: Self) -> Self {
+        if self == Self::Allow && other == Self::Allow {
+            Self::Allow
+        } else {
+            Self::Deny
+        }
+    }
+
+    fn or(self, other: Self) -> Self {
+        if self == Self::Allow || other == Self::Allow {
+            Self::Allow
+        } else {
+            Self::Deny
+        }
+    }
+
+    fn not(self) -> Self {
+        match self {
+            Self::Allow => Self::Deny,
+            Self::Deny => Self::Allow,
+        }
+    }
+}
+
+pub struct And<L, R>(L, R);
+
+impl<L, R> And<L, R> {
+    pub const fn new(left: L, right: R) -> Self {
+        Self(left, right)
+    }
+}
+
+impl<S, R, A, L, P> Policy<S, R, A> for And<L, P>
+where
+    L: Policy<S, R, A>,
+    P: Policy<S, R, A>,
+{
+    fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
+        let left = self.0.evaluate(subject, resource, action);
+
+        if left == PolicyDecision::Deny {
+            return PolicyDecision::Deny;
+        }
+
+        left.and(self.1.evaluate(subject, resource, action))
+    }
+}
+
+pub struct Or<L, R>(L, R);
+
+impl<L, R> Or<L, R> {
+    pub const fn new(left: L, right: R) -> Self {
+        Self(left, right)
+    }
+}
+
+impl<S, R, A, L, P> Policy<S, R, A> for Or<L, P>
+where
+    L: Policy<S, R, A>,
+    P: Policy<S, R, A>,
+{
+    fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
+        let left = self.0.evaluate(subject, resource, action);
+
+        if left == PolicyDecision::Allow {
+            return PolicyDecision::Allow;
+        }
+
+        left.or(self.1.evaluate(subject, resource, action))
+    }
+}
+
+pub struct Not<P>(P);
+
+impl<P> Not<P> {
+    pub const fn new(policy: P) -> Self {
+        Self(policy)
+    }
+}
+
+impl<S, R, A, P> Policy<S, R, A> for Not<P>
+where
+    P: Policy<S, R, A>,
+{
+    fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
+        self.0.evaluate(subject, resource, action).not()
+    }
+}
+
 pub struct All<P>(Vec<P>);
 
 impl<P> All<P> {
@@ -60,11 +150,10 @@ where
             return PolicyDecision::Deny;
         }
 
-        if self
-            .0
-            .iter()
-            .all(|policy| policy.evaluate(subject, resource, action) == PolicyDecision::Allow)
-        {
+        if self.0.iter().all(|policy| {
+            PolicyDecision::Allow.and(policy.evaluate(subject, resource, action))
+                == PolicyDecision::Allow
+        }) {
             return PolicyDecision::Allow;
         }
 
@@ -103,11 +192,10 @@ where
     P: Policy<S, R, A>,
 {
     fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
-        if self
-            .0
-            .iter()
-            .any(|policy| policy.evaluate(subject, resource, action) == PolicyDecision::Allow)
-        {
+        if self.0.iter().any(|policy| {
+            PolicyDecision::Deny.or(policy.evaluate(subject, resource, action))
+                == PolicyDecision::Allow
+        }) {
             return PolicyDecision::Allow;
         }
 
