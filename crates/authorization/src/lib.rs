@@ -1,16 +1,5 @@
-pub trait Subject {
-    type Identity: Copy + Eq + 'static;
+pub use policy::{Policy, PolicyDecision};
+pub use subject::Subject;
 
-    fn identity(&self) -> Self::Identity;
-}
-
-pub trait Policy<S, R, A = ()> {
-    fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision;
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum PolicyDecision {
-    #[default]
-    Deny,
-    Allow,
-}
+pub mod policy;
+pub mod subject;
