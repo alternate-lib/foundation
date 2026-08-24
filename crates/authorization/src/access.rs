@@ -35,11 +35,12 @@ impl<S, R, A> AccessRequest<S, R, A> {
         policy: &P,
     ) -> Result<Authorized<R, A>, AccessRequestError> {
         match policy.evaluate(&self.subject, &self.resource, &self.action) {
-            PolicyDecision::Allow => Ok(Authorized {
+            PolicyDecision::Permit => Ok(Authorized {
                 resource: self.resource,
                 _action: PhantomData,
             }),
             PolicyDecision::Deny => Err(AccessRequestError::Denied),
+            PolicyDecision::NotApplicable => Err(AccessRequestError::NotApplicable),
         }
     }
 }
@@ -77,4 +78,7 @@ impl<R, A: ReadAccess> AsRef<R> for Authorized<R, A> {
 pub enum AccessRequestError {
     #[error("access denied")]
     Denied,
+
+    #[error("no applicable policy found")]
+    NotApplicable,
 }

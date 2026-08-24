@@ -4,16 +4,43 @@ pub trait Policy<S, R, A = ()> {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum PolicyDecision {
+    Permit,
     #[default]
     Deny,
-    Allow,
+    NotApplicable,
 }
 
-pub struct Allow;
+impl PolicyDecision {
+    fn and(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Deny, _) | (_, Self::Deny) => Self::Deny,
+            (Self::Permit, Self::Permit) => Self::Permit,
+            _ => Self::NotApplicable,
+        }
+    }
 
-impl<S, R, A> Policy<S, R, A> for Allow {
+    fn or(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Permit, _) | (_, Self::Permit) => Self::Permit,
+            (Self::Deny, Self::Deny) => Self::Deny,
+            _ => Self::NotApplicable,
+        }
+    }
+
+    fn not(self) -> Self {
+        match self {
+            Self::Permit => Self::Deny,
+            Self::Deny => Self::Permit,
+            Self::NotApplicable => Self::NotApplicable,
+        }
+    }
+}
+
+pub struct Permit;
+
+impl<S, R, A> Policy<S, R, A> for Permit {
     fn evaluate(&self, _: &S, _: &R, _: &A) -> PolicyDecision {
-        PolicyDecision::Allow
+        PolicyDecision::Permit
     }
 }
 
@@ -22,31 +49,6 @@ pub struct Deny;
 impl<S, R, A> Policy<S, R, A> for Deny {
     fn evaluate(&self, _: &S, _: &R, _: &A) -> PolicyDecision {
         PolicyDecision::Deny
-    }
-}
-
-impl PolicyDecision {
-    fn and(self, other: Self) -> Self {
-        if self == Self::Allow && other == Self::Allow {
-            Self::Allow
-        } else {
-            Self::Deny
-        }
-    }
-
-    fn or(self, other: Self) -> Self {
-        if self == Self::Allow || other == Self::Allow {
-            Self::Allow
-        } else {
-            Self::Deny
-        }
-    }
-
-    fn not(self) -> Self {
-        match self {
-            Self::Allow => Self::Deny,
-            Self::Deny => Self::Allow,
-        }
     }
 }
 
@@ -65,7 +67,6 @@ where
 {
     fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
         let left = self.0.evaluate(subject, resource, action);
-
         if left == PolicyDecision::Deny {
             return PolicyDecision::Deny;
         }
@@ -89,9 +90,8 @@ where
 {
     fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
         let left = self.0.evaluate(subject, resource, action);
-
-        if left == PolicyDecision::Allow {
-            return PolicyDecision::Allow;
+        if left == PolicyDecision::Permit {
+            return PolicyDecision::Permit;
         }
 
         left.or(self.1.evaluate(subject, resource, action))
@@ -147,17 +147,18 @@ where
 {
     fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
         if self.0.is_empty() {
-            return PolicyDecision::Deny;
+            return PolicyDecision::NotApplicable;
         }
 
-        if self.0.iter().all(|policy| {
-            PolicyDecision::Allow.and(policy.evaluate(subject, resource, action))
-                == PolicyDecision::Allow
-        }) {
-            return PolicyDecision::Allow;
+        let mut decision = PolicyDecision::Permit;
+        for policy in &self.0 {
+            decision = decision.and(policy.evaluate(subject, resource, action));
+            if decision == PolicyDecision::Deny {
+                break;
+            }
         }
 
-        PolicyDecision::Deny
+        decision
     }
 }
 
@@ -192,14 +193,19 @@ where
     P: Policy<S, R, A>,
 {
     fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
-        if self.0.iter().any(|policy| {
-            PolicyDecision::Deny.or(policy.evaluate(subject, resource, action))
-                == PolicyDecision::Allow
-        }) {
-            return PolicyDecision::Allow;
+        if self.0.is_empty() {
+            return PolicyDecision::NotApplicable;
         }
 
-        PolicyDecision::Deny
+        let mut decision = PolicyDecision::Deny;
+        for policy in &self.0 {
+            decision = decision.or(policy.evaluate(subject, resource, action));
+            if decision == PolicyDecision::Permit {
+                break;
+            }
+        }
+
+        decision
     }
 }
 
