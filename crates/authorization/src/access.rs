@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use crate::{Policy, PolicyDecision, Subject};
 
 pub struct AccessRequest;
@@ -29,12 +27,16 @@ impl<S> SubjectRequest<S> {
 }
 
 impl<S: Subject> SubjectRequest<S> {
-    pub fn authorize<P>(self, policy: &P) -> Result<(), RequestError>
+    pub fn authorize<P>(self, policy: &P) -> Result<Grant<S>, RequestError>
     where
         P: Policy<S, (), ()>,
     {
         match policy.evaluate(&self.subject, &(), &()) {
-            PolicyDecision::Permit => Ok(()),
+            PolicyDecision::Permit => Ok(Grant {
+                subject: self.subject,
+                action: (),
+                resource: (),
+            }),
             PolicyDecision::Deny => Err(RequestError::Denied),
             PolicyDecision::NotApplicable => Err(RequestError::NotApplicable),
         }
@@ -62,12 +64,16 @@ impl<S, A> ActionRequest<S, A> {
 }
 
 impl<S: Subject, A> ActionRequest<S, A> {
-    pub fn authorize<P>(self, policy: &P) -> Result<(), RequestError>
+    pub fn authorize<P>(self, policy: &P) -> Result<Grant<S, A>, RequestError>
     where
         P: Policy<S, (), A>,
     {
         match policy.evaluate(&self.subject, &(), &self.action) {
-            PolicyDecision::Permit => Ok(()),
+            PolicyDecision::Permit => Ok(Grant {
+                subject: self.subject,
+                action: self.action,
+                resource: (),
+            }),
             PolicyDecision::Deny => Err(RequestError::Denied),
             PolicyDecision::NotApplicable => Err(RequestError::NotApplicable),
         }
@@ -89,14 +95,15 @@ impl<S: Subject, A, R> ResourceRequest<S, A, R> {
         }
     }
 
-    pub fn authorize<P>(self, policy: &P) -> Result<Authorized<R, A>, RequestError>
+    pub fn authorize<P>(self, policy: &P) -> Result<Grant<S, A, R>, RequestError>
     where
         P: Policy<S, R, A>,
     {
         match policy.evaluate(&self.subject, &self.resource, &self.action) {
-            PolicyDecision::Permit => Ok(Authorized {
+            PolicyDecision::Permit => Ok(Grant {
+                subject: self.subject,
+                action: self.action,
                 resource: self.resource,
-                _action: PhantomData,
             }),
             PolicyDecision::Deny => Err(RequestError::Denied),
             PolicyDecision::NotApplicable => Err(RequestError::NotApplicable),
@@ -104,32 +111,23 @@ impl<S: Subject, A, R> ResourceRequest<S, A, R> {
     }
 }
 
-pub trait ReadAccess {}
-
-impl ReadAccess for () {}
-
-pub trait WriteAccess: ReadAccess {}
-
-pub struct Authorized<R, A> {
+pub struct Grant<S, A = (), R = ()> {
+    subject: S,
+    action: A,
     resource: R,
-    _action: PhantomData<A>,
 }
 
-impl<R, A> Authorized<R, A> {
-    pub fn into_inner(self) -> R {
+impl<S, A, R> Grant<S, A, R> {
+    pub fn subject(&self) -> &S {
+        &self.subject
+    }
+
+    pub fn action(&self) -> &A {
+        &self.action
+    }
+
+    pub fn into_resource(self) -> R {
         self.resource
-    }
-}
-
-impl<R, A: WriteAccess> Authorized<R, A> {
-    pub fn with_edit<E>(&mut self, f: impl FnOnce(&mut R) -> Result<(), E>) -> Result<(), E> {
-        f(&mut self.resource)
-    }
-}
-
-impl<R, A: ReadAccess> AsRef<R> for Authorized<R, A> {
-    fn as_ref(&self) -> &R {
-        &self.resource
     }
 }
 

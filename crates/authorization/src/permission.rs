@@ -1,5 +1,5 @@
 use crate::{
-    ActionRequest, Authorized, Policy, PolicyDecision, RequestError, ResourceRequest, Subject,
+    ActionRequest, Grant, Policy, PolicyDecision, RequestError, ResourceRequest, Subject,
     policy::{All, Any},
 };
 
@@ -40,14 +40,14 @@ impl<S, A, P> ActionRequest<S, A>
 where
     S: HasPermission<A, Permission = P>,
 {
-    pub fn check_permission(self, permission: P) -> Result<(), RequestError> {
+    pub fn check_permission(self, permission: P) -> Result<Grant<S, A>, RequestError> {
         self.authorize(&RequirePermission::new(permission))
     }
 
     pub fn check_all_permissions(
         self,
         permissions: impl IntoIterator<Item = P>,
-    ) -> Result<(), RequestError> {
+    ) -> Result<Grant<S, A>, RequestError> {
         let policy = All::from_iter(permissions.into_iter().map(RequirePermission::new));
 
         self.authorize(&policy)
@@ -56,7 +56,7 @@ where
     pub fn check_any_permission(
         self,
         permissions: impl IntoIterator<Item = P>,
-    ) -> Result<(), RequestError> {
+    ) -> Result<Grant<S, A>, RequestError> {
         let policy = Any::from_iter(permissions.into_iter().map(RequirePermission::new));
 
         self.authorize(&policy)
@@ -67,14 +67,14 @@ impl<S, A, R, P> ResourceRequest<S, A, R>
 where
     S: HasPermission<A, Permission = P>,
 {
-    pub fn check_permission(self, permission: P) -> Result<Authorized<R, A>, RequestError> {
+    pub fn check_permission(self, permission: P) -> Result<Grant<S, A, R>, RequestError> {
         self.authorize(&RequirePermission::new(permission))
     }
 
     pub fn check_all_permissions(
         self,
         permissions: impl IntoIterator<Item = P>,
-    ) -> Result<Authorized<R, A>, RequestError> {
+    ) -> Result<Grant<S, A, R>, RequestError> {
         let policy = All::from_iter(permissions.into_iter().map(RequirePermission::new));
 
         self.authorize(&policy)
@@ -83,7 +83,7 @@ where
     pub fn check_any_permission(
         self,
         permissions: impl IntoIterator<Item = P>,
-    ) -> Result<Authorized<R, A>, RequestError> {
+    ) -> Result<Grant<S, A, R>, RequestError> {
         let policy = Any::from_iter(permissions.into_iter().map(RequirePermission::new));
 
         self.authorize(&policy)
@@ -115,14 +115,14 @@ impl<S, A, R, P> ResourceRequest<S, A, R>
 where
     S: HasPermissionOn<R, A, Permission = P>,
 {
-    pub fn check_permission_on(self, permission: P) -> Result<Authorized<R, A>, RequestError> {
+    pub fn check_permission_on(self, permission: P) -> Result<Grant<S, A, R>, RequestError> {
         self.authorize(&RequirePermissionOn::new(permission))
     }
 
     pub fn check_all_permissions_on(
         self,
         permissions: impl IntoIterator<Item = P>,
-    ) -> Result<Authorized<R, A>, RequestError> {
+    ) -> Result<Grant<S, A, R>, RequestError> {
         let policy = All::from_iter(permissions.into_iter().map(RequirePermissionOn::new));
 
         self.authorize(&policy)
@@ -131,7 +131,7 @@ where
     pub fn check_any_permission_on(
         self,
         permissions: impl IntoIterator<Item = P>,
-    ) -> Result<Authorized<R, A>, RequestError> {
+    ) -> Result<Grant<S, A, R>, RequestError> {
         let policy = Any::from_iter(permissions.into_iter().map(RequirePermissionOn::new));
 
         self.authorize(&policy)
