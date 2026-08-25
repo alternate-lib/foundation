@@ -1,5 +1,5 @@
 use crate::{
-    AccessRequest, AccessRequestError, Authorized, Policy, PolicyDecision, Subject,
+    ActionRequest, Authorized, Policy, PolicyDecision, RequestError, ResourceRequest, Subject,
     policy::{All, Any},
 };
 
@@ -36,18 +36,18 @@ where
     }
 }
 
-impl<S, R, A, P> AccessRequest<S, R, A>
+impl<S, A, P> ActionRequest<S, A>
 where
     S: HasPermission<A, Permission = P>,
 {
-    pub fn check_permission(self, permission: P) -> Result<Authorized<R, A>, AccessRequestError> {
+    pub fn check_permission(self, permission: P) -> Result<(), RequestError> {
         self.authorize(&RequirePermission::new(permission))
     }
 
     pub fn check_all_permissions(
         self,
         permissions: impl IntoIterator<Item = P>,
-    ) -> Result<Authorized<R, A>, AccessRequestError> {
+    ) -> Result<(), RequestError> {
         let policy = All::from_iter(permissions.into_iter().map(RequirePermission::new));
 
         self.authorize(&policy)
@@ -56,7 +56,34 @@ where
     pub fn check_any_permission(
         self,
         permissions: impl IntoIterator<Item = P>,
-    ) -> Result<Authorized<R, A>, AccessRequestError> {
+    ) -> Result<(), RequestError> {
+        let policy = Any::from_iter(permissions.into_iter().map(RequirePermission::new));
+
+        self.authorize(&policy)
+    }
+}
+
+impl<S, A, R, P> ResourceRequest<S, A, R>
+where
+    S: HasPermission<A, Permission = P>,
+{
+    pub fn check_permission(self, permission: P) -> Result<Authorized<R, A>, RequestError> {
+        self.authorize(&RequirePermission::new(permission))
+    }
+
+    pub fn check_all_permissions(
+        self,
+        permissions: impl IntoIterator<Item = P>,
+    ) -> Result<Authorized<R, A>, RequestError> {
+        let policy = All::from_iter(permissions.into_iter().map(RequirePermission::new));
+
+        self.authorize(&policy)
+    }
+
+    pub fn check_any_permission(
+        self,
+        permissions: impl IntoIterator<Item = P>,
+    ) -> Result<Authorized<R, A>, RequestError> {
         let policy = Any::from_iter(permissions.into_iter().map(RequirePermission::new));
 
         self.authorize(&policy)
@@ -84,21 +111,18 @@ where
     }
 }
 
-impl<S, R, A, P> AccessRequest<S, R, A>
+impl<S, A, R, P> ResourceRequest<S, A, R>
 where
     S: HasPermissionOn<R, A, Permission = P>,
 {
-    pub fn check_permission_on(
-        self,
-        permission: P,
-    ) -> Result<Authorized<R, A>, AccessRequestError> {
+    pub fn check_permission_on(self, permission: P) -> Result<Authorized<R, A>, RequestError> {
         self.authorize(&RequirePermissionOn::new(permission))
     }
 
     pub fn check_all_permissions_on(
         self,
         permissions: impl IntoIterator<Item = P>,
-    ) -> Result<Authorized<R, A>, AccessRequestError> {
+    ) -> Result<Authorized<R, A>, RequestError> {
         let policy = All::from_iter(permissions.into_iter().map(RequirePermissionOn::new));
 
         self.authorize(&policy)
@@ -107,7 +131,7 @@ where
     pub fn check_any_permission_on(
         self,
         permissions: impl IntoIterator<Item = P>,
-    ) -> Result<Authorized<R, A>, AccessRequestError> {
+    ) -> Result<Authorized<R, A>, RequestError> {
         let policy = Any::from_iter(permissions.into_iter().map(RequirePermissionOn::new));
 
         self.authorize(&policy)

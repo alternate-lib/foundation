@@ -1,4 +1,7 @@
-pub use access::{AccessRequest, AccessRequestError, Authorized, ReadAccess, WriteAccess};
+pub use access::{
+    AccessRequest, ActionRequest, Authorized, ReadAccess, RequestError, ResourceRequest,
+    SubjectRequest, WriteAccess,
+};
 pub use permission::{HasPermission, HasPermissionOn};
 pub use policy::{Policy, PolicyDecision};
 pub use role::HasRole;

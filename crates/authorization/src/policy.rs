@@ -1,4 +1,4 @@
-pub trait Policy<S, R, A = ()> {
+pub trait Policy<S, R, A> {
     fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision;
 }
 

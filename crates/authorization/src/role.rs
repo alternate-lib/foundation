@@ -1,5 +1,6 @@
 use crate::{
-    AccessRequest, AccessRequestError, Authorized, Policy, PolicyDecision, Subject,
+    ActionRequest, Authorized, Policy, PolicyDecision, RequestError, ResourceRequest, Subject,
+    SubjectRequest,
     policy::{All, Any},
 };
 
@@ -30,18 +31,18 @@ where
     }
 }
 
-impl<S, Re, A, Ro> AccessRequest<S, Re, A>
+impl<S> SubjectRequest<S>
 where
-    S: HasRole<Role = Ro>,
+    S: HasRole,
 {
-    pub fn check_role(self, role: Ro) -> Result<Authorized<Re, A>, AccessRequestError> {
+    pub fn check_role(self, role: S::Role) -> Result<(), RequestError> {
         self.authorize(&RequireRole::new(role))
     }
 
     pub fn check_all_roles(
         self,
-        roles: impl IntoIterator<Item = Ro>,
-    ) -> Result<Authorized<Re, A>, AccessRequestError> {
+        roles: impl IntoIterator<Item = S::Role>,
+    ) -> Result<(), RequestError> {
         let policy = All::from_iter(roles.into_iter().map(RequireRole::new));
 
         self.authorize(&policy)
@@ -49,8 +50,62 @@ where
 
     pub fn check_any_role(
         self,
-        roles: impl IntoIterator<Item = Ro>,
-    ) -> Result<Authorized<Re, A>, AccessRequestError> {
+        roles: impl IntoIterator<Item = S::Role>,
+    ) -> Result<(), RequestError> {
+        let policy = Any::from_iter(roles.into_iter().map(RequireRole::new));
+
+        self.authorize(&policy)
+    }
+}
+
+impl<S, A> ActionRequest<S, A>
+where
+    S: HasRole,
+{
+    pub fn check_role(self, role: S::Role) -> Result<(), RequestError> {
+        self.authorize(&RequireRole::new(role))
+    }
+
+    pub fn check_all_roles(
+        self,
+        roles: impl IntoIterator<Item = S::Role>,
+    ) -> Result<(), RequestError> {
+        let policy = All::from_iter(roles.into_iter().map(RequireRole::new));
+
+        self.authorize(&policy)
+    }
+
+    pub fn check_any_role(
+        self,
+        roles: impl IntoIterator<Item = S::Role>,
+    ) -> Result<(), RequestError> {
+        let policy = Any::from_iter(roles.into_iter().map(RequireRole::new));
+
+        self.authorize(&policy)
+    }
+}
+
+impl<S, A, R> ResourceRequest<S, A, R>
+where
+    S: HasRole,
+{
+    pub fn check_role(self, role: S::Role) -> Result<Authorized<R, A>, RequestError> {
+        self.authorize(&RequireRole::new(role))
+    }
+
+    pub fn check_all_roles(
+        self,
+        roles: impl IntoIterator<Item = S::Role>,
+    ) -> Result<Authorized<R, A>, RequestError> {
+        let policy = All::from_iter(roles.into_iter().map(RequireRole::new));
+
+        self.authorize(&policy)
+    }
+
+    pub fn check_any_role(
+        self,
+        roles: impl IntoIterator<Item = S::Role>,
+    ) -> Result<Authorized<R, A>, RequestError> {
         let policy = Any::from_iter(roles.into_iter().map(RequireRole::new));
 
         self.authorize(&policy)
