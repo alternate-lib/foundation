@@ -1,4 +1,10 @@
-use crate::{Policy, PolicyDecision, Subject};
+use crate::{Policy, PolicyDecision};
+
+pub trait Subject {
+    type Identity: Copy + Eq + 'static;
+
+    fn identity(&self) -> Self::Identity;
+}
 
 pub struct AccessRequest;
 
