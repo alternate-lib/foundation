@@ -117,6 +117,7 @@ impl<S: Subject, A, R> ResourceRequest<S, A, R> {
     }
 }
 
+#[derive(Debug)]
 pub struct Grant<S, A = (), R = ()> {
     subject: S,
     action: A,
@@ -144,4 +145,60 @@ pub enum RequestError {
 
     #[error("no applicable policy found")]
     NotApplicable,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        policy::{Deny, NotApplicable, Permit},
+        test_utils::*,
+    };
+
+    #[test]
+    fn grants_access_to_subject_for_permitting_policy() {
+        let result = AccessRequest::for_subject(User::new(1)).authorize(&Permit);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn grants_access_to_action_for_permitting_policy() {
+        let result = AccessRequest::for_subject(User::new(1))
+            .performing_action("read")
+            .authorize(&Permit);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn grants_access_to_resource_for_permitting_policy() {
+        let resource = "document";
+
+        let grant = AccessRequest::for_subject(User::new(1))
+            .performing_action("read")
+            .on_resource(resource)
+            .authorize(&Permit)
+            .expect("permit must grant access");
+
+        assert_eq!(grant.into_resource(), resource);
+    }
+
+    #[test]
+    fn denies_access_for_denying_policy() {
+        let err = AccessRequest::for_subject(User::new(1))
+            .authorize(&Deny)
+            .unwrap_err();
+
+        assert!(matches!(err, RequestError::Denied));
+    }
+
+    #[test]
+    fn denies_access_for_not_applicable_policy() {
+        let result = AccessRequest::for_subject(User::new(1))
+            .authorize(&NotApplicable)
+            .unwrap_err();
+
+        assert!(matches!(result, RequestError::NotApplicable));
+    }
 }

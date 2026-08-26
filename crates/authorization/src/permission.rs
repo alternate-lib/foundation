@@ -137,3 +137,122 @@ where
         self.authorize(&policy)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{AccessRequest, test_utils::*};
+
+    #[test]
+    fn grants_access_on_possessing_action_permission() {
+        let result = AccessRequest::for_subject(User::new(1).with_permission(Permission::Write))
+            .performing_action("write")
+            .check_permission(Permission::Write);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn denies_access_on_missing_action_permission() {
+        let err = AccessRequest::for_subject(User::new(2).with_permission(Permission::Read))
+            .performing_action("write")
+            .check_permission(Permission::Write)
+            .unwrap_err();
+
+        assert!(matches!(err, RequestError::Denied));
+    }
+
+    #[test]
+    fn grants_access_on_posessing_all_action_permissions() {
+        let result = AccessRequest::for_subject(
+            User::new(1)
+                .with_permission(Permission::Read)
+                .with_permission(Permission::Write),
+        )
+        .performing_action("edit")
+        .check_all_permissions([Permission::Read, Permission::Write]);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn denies_access_on_missing_some_action_permissions() {
+        let err = AccessRequest::for_subject(User::new(1).with_permission(Permission::Read))
+            .performing_action("edit")
+            .check_all_permissions([Permission::Read, Permission::Write])
+            .unwrap_err();
+
+        assert!(matches!(err, RequestError::Denied));
+    }
+
+    #[test]
+    fn grants_access_on_posessing_any_action_permission() {
+        let result = AccessRequest::for_subject(User::new(1).with_permission(Permission::Read))
+            .performing_action("edit")
+            .check_any_permission([Permission::Read, Permission::Write]);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn grants_access_on_possessing_resource_permission() {
+        let user_id = 1;
+
+        let result = AccessRequest::for_subject(User::new(1).with_permission(Permission::Write))
+            .performing_action("write")
+            .on_resource(Post::with_owner(user_id))
+            .check_permission_on(Permission::Write);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn denies_access_on_missing_resource_permission() {
+        let user_id = 1;
+
+        let err = AccessRequest::for_subject(User::new(user_id).with_permission(Permission::Read))
+            .performing_action("write")
+            .on_resource(Post::with_owner(user_id))
+            .check_permission(Permission::Write)
+            .unwrap_err();
+
+        assert!(matches!(err, RequestError::Denied));
+    }
+
+    #[test]
+    fn grants_access_on_posessing_all_resource_permissions() {
+        let user_id = 1;
+
+        let result = AccessRequest::for_subject(
+            User::new(user_id)
+                .with_permission(Permission::Read)
+                .with_permission(Permission::Write),
+        )
+        .performing_action("edit")
+        .on_resource(Post::with_owner(user_id))
+        .check_all_permissions_on([Permission::Read, Permission::Write]);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn denies_access_on_missing_some_resource_permissions() {
+        let err = AccessRequest::for_subject(User::new(1).with_permission(Permission::Write))
+            .performing_action("edit")
+            .on_resource(Post::with_owner(2))
+            .check_all_permissions_on([Permission::Read, Permission::Write])
+            .unwrap_err();
+
+        assert!(matches!(err, RequestError::Denied));
+    }
+
+    #[test]
+    fn grants_access_on_posessing_any_resource_permission() {
+        let result = AccessRequest::for_subject(User::new(1).with_permission(Permission::Read))
+            .performing_action("edit")
+            .on_resource(Post::with_owner(2))
+            .check_any_permission_on([Permission::Read, Permission::Write]);
+
+        assert!(result.is_ok());
+    }
+}

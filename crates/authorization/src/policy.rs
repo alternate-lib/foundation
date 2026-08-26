@@ -293,3 +293,148 @@ where
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn decision(p: &impl Policy<(), (), ()>) -> PolicyDecision {
+        p.evaluate(&(), &(), &())
+    }
+
+    fn fn_policy(
+        f: fn(&(), &(), &()) -> PolicyDecision,
+    ) -> FnPolicy<fn(&(), &(), &()) -> PolicyDecision> {
+        FnPolicy(f)
+    }
+
+    #[test]
+    fn handles_conjunction() {
+        assert_eq!(
+            PolicyLogic::and(PolicyDecision::Permit, PolicyDecision::Permit),
+            PolicyDecision::Permit
+        );
+        assert_eq!(
+            PolicyLogic::and(PolicyDecision::Permit, PolicyDecision::Deny),
+            PolicyDecision::Deny
+        );
+        assert_eq!(
+            PolicyLogic::and(PolicyDecision::Permit, PolicyDecision::NotApplicable),
+            PolicyDecision::Permit
+        );
+        assert_eq!(
+            PolicyLogic::and(PolicyDecision::Deny, PolicyDecision::Permit),
+            PolicyDecision::Deny
+        );
+        assert_eq!(
+            PolicyLogic::and(PolicyDecision::Deny, PolicyDecision::Deny),
+            PolicyDecision::Deny
+        );
+        assert_eq!(
+            PolicyLogic::and(PolicyDecision::Deny, PolicyDecision::NotApplicable),
+            PolicyDecision::Deny
+        );
+        assert_eq!(
+            PolicyLogic::and(PolicyDecision::NotApplicable, PolicyDecision::Permit),
+            PolicyDecision::Permit
+        );
+        assert_eq!(
+            PolicyLogic::and(PolicyDecision::NotApplicable, PolicyDecision::Deny),
+            PolicyDecision::Deny
+        );
+        assert_eq!(
+            PolicyLogic::and(PolicyDecision::NotApplicable, PolicyDecision::NotApplicable),
+            PolicyDecision::NotApplicable
+        );
+    }
+
+    #[test]
+    fn handles_disjunction() {
+        assert_eq!(
+            PolicyLogic::or(PolicyDecision::Permit, PolicyDecision::Permit),
+            PolicyDecision::Permit
+        );
+        assert_eq!(
+            PolicyLogic::or(PolicyDecision::Permit, PolicyDecision::Deny),
+            PolicyDecision::Permit
+        );
+        assert_eq!(
+            PolicyLogic::or(PolicyDecision::Permit, PolicyDecision::NotApplicable),
+            PolicyDecision::Permit
+        );
+        assert_eq!(
+            PolicyLogic::or(PolicyDecision::Deny, PolicyDecision::Permit),
+            PolicyDecision::Permit
+        );
+        assert_eq!(
+            PolicyLogic::or(PolicyDecision::Deny, PolicyDecision::Deny),
+            PolicyDecision::Deny
+        );
+        assert_eq!(
+            PolicyLogic::or(PolicyDecision::Deny, PolicyDecision::NotApplicable),
+            PolicyDecision::Deny
+        );
+        assert_eq!(
+            PolicyLogic::or(PolicyDecision::NotApplicable, PolicyDecision::Permit),
+            PolicyDecision::Permit
+        );
+        assert_eq!(
+            PolicyLogic::or(PolicyDecision::NotApplicable, PolicyDecision::Deny),
+            PolicyDecision::Deny
+        );
+        assert_eq!(
+            PolicyLogic::or(PolicyDecision::NotApplicable, PolicyDecision::NotApplicable),
+            PolicyDecision::NotApplicable
+        );
+    }
+
+    #[test]
+    fn handles_negation() {
+        assert_eq!(
+            PolicyLogic::not(PolicyDecision::Permit),
+            PolicyDecision::Deny
+        );
+        assert_eq!(
+            PolicyLogic::not(PolicyDecision::Deny),
+            PolicyDecision::Permit
+        );
+        assert_eq!(
+            PolicyLogic::not(PolicyDecision::NotApplicable),
+            PolicyDecision::NotApplicable
+        );
+    }
+
+    #[test]
+    fn short_circuits_conjunction_on_denying_policy() {
+        let panic_if_evaluated =
+            fn_policy(|(), (), ()| panic!("right side of And must not be evaluated"));
+
+        assert_eq!(
+            decision(&And::new(Deny, panic_if_evaluated)),
+            PolicyDecision::Deny
+        );
+    }
+
+    #[test]
+    fn short_circuits_disjunction_on_permitting_policy() {
+        let panic_if_evaluated =
+            fn_policy(|(), (), ()| panic!("right side of Or must not be evaluated"));
+
+        assert_eq!(
+            decision(&Or::new(Permit, panic_if_evaluated)),
+            PolicyDecision::Permit
+        );
+    }
+
+    #[test]
+    fn does_not_evalute_policies_on_empty_collections() {
+        assert_eq!(
+            decision(&All::<Permit>::new()),
+            PolicyDecision::NotApplicable
+        );
+        assert_eq!(
+            decision(&Any::<Permit>::new()),
+            PolicyDecision::NotApplicable
+        );
+    }
+}
