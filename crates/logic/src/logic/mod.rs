@@ -1,3 +1,9 @@
+pub use boolean::Boolean;
+pub use kleene::{KleeneMapping, KleeneValue, StrongKleene};
+
+mod boolean;
+mod kleene;
+
 /// Identifies a domain's truth-value type.
 pub trait Logic {
     /// The truth value evaluated by predicates.
