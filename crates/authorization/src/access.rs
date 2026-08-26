@@ -66,9 +66,9 @@ impl<S, A> ActionRequest<S, A> {
 impl<S: Subject, A> ActionRequest<S, A> {
     pub fn authorize<P>(self, policy: &P) -> Result<Grant<S, A>, RequestError>
     where
-        P: Policy<S, (), A>,
+        P: Policy<S, A, ()>,
     {
-        match policy.evaluate(&self.subject, &(), &self.action) {
+        match policy.evaluate(&self.subject, &self.action, &()) {
             PolicyDecision::Permit => Ok(Grant {
                 subject: self.subject,
                 action: self.action,
@@ -97,9 +97,9 @@ impl<S: Subject, A, R> ResourceRequest<S, A, R> {
 
     pub fn authorize<P>(self, policy: &P) -> Result<Grant<S, A, R>, RequestError>
     where
-        P: Policy<S, R, A>,
+        P: Policy<S, A, R>,
     {
-        match policy.evaluate(&self.subject, &self.resource, &self.action) {
+        match policy.evaluate(&self.subject, &self.action, &self.resource) {
             PolicyDecision::Permit => Ok(Grant {
                 subject: self.subject,
                 action: self.action,

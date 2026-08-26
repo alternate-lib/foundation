@@ -9,10 +9,10 @@ pub trait HasPermission<A>: Subject {
     fn has_permission(&self, permission: &Self::Permission, action: &A) -> bool;
 }
 
-pub trait HasPermissionOn<R, A>: Subject {
+pub trait HasPermissionOn<A, R>: Subject {
     type Permission: Eq;
 
-    fn has_permission_on(&self, permission: &Self::Permission, resource: &R, action: &A) -> bool;
+    fn has_permission_on(&self, permission: &Self::Permission, action: &A, resource: &R) -> bool;
 }
 
 pub struct RequirePermission<P>(P);
@@ -23,11 +23,11 @@ impl<P> RequirePermission<P> {
     }
 }
 
-impl<S, R, A, P> Policy<S, R, A> for RequirePermission<P>
+impl<S, A, R, P> Policy<S, A, R> for RequirePermission<P>
 where
     S: HasPermission<A, Permission = P>,
 {
-    fn evaluate(&self, subject: &S, _: &R, action: &A) -> PolicyDecision {
+    fn evaluate(&self, subject: &S, action: &A, _: &R) -> PolicyDecision {
         if subject.has_permission(&self.0, action) {
             return PolicyDecision::Permit;
         }
@@ -98,12 +98,12 @@ impl<P> RequirePermissionOn<P> {
     }
 }
 
-impl<S, R, A, P> Policy<S, R, A> for RequirePermissionOn<P>
+impl<S, A, R, P> Policy<S, A, R> for RequirePermissionOn<P>
 where
-    S: HasPermissionOn<R, A, Permission = P>,
+    S: HasPermissionOn<A, R, Permission = P>,
 {
-    fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
-        if subject.has_permission_on(&self.0, resource, action) {
+    fn evaluate(&self, subject: &S, action: &A, resource: &R) -> PolicyDecision {
+        if subject.has_permission_on(&self.0, action, resource) {
             PolicyDecision::Permit
         } else {
             PolicyDecision::Deny
@@ -113,7 +113,7 @@ where
 
 impl<S, A, R, P> ResourceRequest<S, A, R>
 where
-    S: HasPermissionOn<R, A, Permission = P>,
+    S: HasPermissionOn<A, R, Permission = P>,
 {
     pub fn check_permission_on(self, permission: P) -> Result<Grant<S, A, R>, RequestError> {
         self.authorize(&RequirePermissionOn::new(permission))

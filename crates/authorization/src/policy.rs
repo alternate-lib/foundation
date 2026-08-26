@@ -1,5 +1,12 @@
-pub trait Policy<S, R, A> {
-    fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision;
+use alternate_logic::{
+    Conjunction, Disjunction, Logic, Negation, Predicate,
+    combinator::{
+        All as LogicAll, And as LogicAnd, Any as LogicAny, Not as LogicNot, Or as LogicOr,
+    },
+};
+
+pub trait Policy<S, A, R> {
+    fn evaluate(&self, subject: &S, action: &A, resource: &R) -> PolicyDecision;
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -10,128 +17,210 @@ pub enum PolicyDecision {
     NotApplicable,
 }
 
-impl PolicyDecision {
-    fn and(self, other: Self) -> Self {
-        match (self, other) {
-            (Self::Permit, Self::Permit) => Self::Permit,
-            (Self::Deny, _) | (_, Self::Deny) => Self::Deny,
-            (Self::NotApplicable, d) | (d, Self::NotApplicable) => d,
+struct PolicyLogic;
+
+impl Logic for PolicyLogic {
+    type Value = PolicyDecision;
+}
+
+impl Conjunction for PolicyLogic {
+    fn and(left: PolicyDecision, right: PolicyDecision) -> PolicyDecision {
+        match (left, right) {
+            (PolicyDecision::Permit, PolicyDecision::Permit) => PolicyDecision::Permit,
+            (PolicyDecision::Deny, _) | (_, PolicyDecision::Deny) => PolicyDecision::Deny,
+            (PolicyDecision::NotApplicable, d) | (d, PolicyDecision::NotApplicable) => d,
         }
     }
 
-    fn or(self, other: Self) -> Self {
-        match (self, other) {
-            (Self::Permit, _) | (_, Self::Permit) => Self::Permit,
-            (Self::Deny, Self::Deny) => Self::Deny,
-            (Self::NotApplicable, d) | (d, Self::NotApplicable) => d,
+    fn identity() -> PolicyDecision {
+        PolicyDecision::NotApplicable
+    }
+
+    fn short_circuit(left: &PolicyDecision) -> Option<PolicyDecision> {
+        match left {
+            PolicyDecision::Deny => Some(PolicyDecision::Deny),
+            _ => None,
+        }
+    }
+}
+
+impl Disjunction for PolicyLogic {
+    fn or(left: PolicyDecision, right: PolicyDecision) -> PolicyDecision {
+        match (left, right) {
+            (PolicyDecision::Permit, _) | (_, PolicyDecision::Permit) => PolicyDecision::Permit,
+            (PolicyDecision::Deny, PolicyDecision::Deny) => PolicyDecision::Deny,
+            (PolicyDecision::NotApplicable, d) | (d, PolicyDecision::NotApplicable) => d,
         }
     }
 
-    fn not(self) -> Self {
-        match self {
-            Self::Permit => Self::Deny,
-            Self::Deny => Self::Permit,
-            Self::NotApplicable => Self::NotApplicable,
+    fn identity() -> PolicyDecision {
+        PolicyDecision::NotApplicable
+    }
+
+    fn short_circuit(left: &PolicyDecision) -> Option<PolicyDecision> {
+        match left {
+            PolicyDecision::Permit => Some(PolicyDecision::Permit),
+            _ => None,
         }
+    }
+}
+
+impl Negation for PolicyLogic {
+    fn not(value: PolicyDecision) -> PolicyDecision {
+        match value {
+            PolicyDecision::Permit => PolicyDecision::Deny,
+            PolicyDecision::Deny => PolicyDecision::Permit,
+            PolicyDecision::NotApplicable => PolicyDecision::NotApplicable,
+        }
+    }
+}
+
+struct PolicyContext<'a, S, A, R> {
+    subject: &'a S,
+    action: &'a A,
+    resource: &'a R,
+}
+
+struct PolicyPredicate<P>(P);
+
+impl<'a, S, A, R, P> Predicate<PolicyContext<'a, S, A, R>> for PolicyPredicate<P>
+where
+    P: Policy<S, A, R>,
+{
+    type Logic = PolicyLogic;
+
+    fn evaluate(&self, context: &PolicyContext<'a, S, A, R>) -> PolicyDecision {
+        self.0
+            .evaluate(context.subject, context.action, context.resource)
     }
 }
 
 pub struct Permit;
 
-impl<S, R, A> Policy<S, R, A> for Permit {
-    fn evaluate(&self, _: &S, _: &R, _: &A) -> PolicyDecision {
+impl<S, A, R> Policy<S, A, R> for Permit {
+    fn evaluate(&self, _: &S, _: &A, _: &R) -> PolicyDecision {
         PolicyDecision::Permit
     }
 }
 
 pub struct Deny;
 
-impl<S, R, A> Policy<S, R, A> for Deny {
-    fn evaluate(&self, _: &S, _: &R, _: &A) -> PolicyDecision {
+impl<S, A, R> Policy<S, A, R> for Deny {
+    fn evaluate(&self, _: &S, _: &A, _: &R) -> PolicyDecision {
         PolicyDecision::Deny
     }
 }
 
-pub struct And<L, R>(L, R);
+pub struct NotApplicable;
+
+impl<S, A, R> Policy<S, A, R> for NotApplicable {
+    fn evaluate(&self, _: &S, _: &A, _: &R) -> PolicyDecision {
+        PolicyDecision::NotApplicable
+    }
+}
+
+pub struct FnPolicy<F>(F);
+
+impl<F> FnPolicy<F> {
+    pub fn new(f: F) -> Self {
+        Self(f)
+    }
+}
+
+impl<S, A, R, F> Policy<S, A, R> for FnPolicy<F>
+where
+    F: Fn(&S, &A, &R) -> PolicyDecision,
+{
+    fn evaluate(&self, subject: &S, action: &A, resource: &R) -> PolicyDecision {
+        (self.0)(subject, action, resource)
+    }
+}
+
+pub struct And<L, R>(LogicAnd<PolicyPredicate<L>, PolicyPredicate<R>>);
 
 impl<L, R> And<L, R> {
     pub const fn new(left: L, right: R) -> Self {
-        Self(left, right)
+        Self(LogicAnd::new(PolicyPredicate(left), PolicyPredicate(right)))
     }
 }
 
-impl<S, R, A, L, P> Policy<S, R, A> for And<L, P>
+impl<S, A, Re, L, Ri> Policy<S, A, Re> for And<L, Ri>
 where
-    L: Policy<S, R, A>,
-    P: Policy<S, R, A>,
+    L: Policy<S, A, Re>,
+    Ri: Policy<S, A, Re>,
 {
-    fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
-        let left = self.0.evaluate(subject, resource, action);
-        if left == PolicyDecision::Deny {
-            return PolicyDecision::Deny;
-        }
-
-        left.and(self.1.evaluate(subject, resource, action))
+    fn evaluate(&self, subject: &S, action: &A, resource: &Re) -> PolicyDecision {
+        Predicate::evaluate(
+            &self.0,
+            &PolicyContext {
+                subject,
+                action,
+                resource,
+            },
+        )
     }
 }
 
-pub struct Or<L, R>(L, R);
+pub struct Or<L, R>(LogicOr<PolicyPredicate<L>, PolicyPredicate<R>>);
 
 impl<L, R> Or<L, R> {
     pub const fn new(left: L, right: R) -> Self {
-        Self(left, right)
+        Self(LogicOr::new(PolicyPredicate(left), PolicyPredicate(right)))
     }
 }
 
-impl<S, R, A, L, P> Policy<S, R, A> for Or<L, P>
+impl<S, A, Re, L, Ri> Policy<S, A, Re> for Or<L, Ri>
 where
-    L: Policy<S, R, A>,
-    P: Policy<S, R, A>,
+    L: Policy<S, A, Re>,
+    Ri: Policy<S, A, Re>,
 {
-    fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
-        let left = self.0.evaluate(subject, resource, action);
-        if left == PolicyDecision::Permit {
-            return PolicyDecision::Permit;
-        }
-
-        left.or(self.1.evaluate(subject, resource, action))
+    fn evaluate(&self, subject: &S, action: &A, resource: &Re) -> PolicyDecision {
+        Predicate::evaluate(
+            &self.0,
+            &PolicyContext {
+                subject,
+                action,
+                resource,
+            },
+        )
     }
 }
 
-pub struct Not<P>(P);
+pub struct Not<P>(LogicNot<PolicyPredicate<P>>);
 
 impl<P> Not<P> {
     pub const fn new(policy: P) -> Self {
-        Self(policy)
+        Self(LogicNot::new(PolicyPredicate(policy)))
     }
 }
 
-impl<S, R, A, P> Policy<S, R, A> for Not<P>
+impl<S, A, R, P> Policy<S, A, R> for Not<P>
 where
-    P: Policy<S, R, A>,
+    P: Policy<S, A, R>,
 {
-    fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
-        self.0.evaluate(subject, resource, action).not()
+    fn evaluate(&self, subject: &S, action: &A, resource: &R) -> PolicyDecision {
+        Predicate::evaluate(
+            &self.0,
+            &PolicyContext {
+                subject,
+                action,
+                resource,
+            },
+        )
     }
 }
 
-pub struct All<P>(Vec<P>);
+pub struct All<P>(LogicAll<PolicyPredicate<P>>);
 
 impl<P> All<P> {
     pub const fn new() -> Self {
-        Self(Vec::new())
+        Self(LogicAll::new())
     }
 
     #[must_use]
     pub fn with_policy(mut self, policy: P) -> Self {
-        self.0.push(policy);
+        self.0 = self.0.with_predicate(PolicyPredicate(policy));
         self
-    }
-}
-
-impl<P> FromIterator<P> for All<P> {
-    fn from_iter<T: IntoIterator<Item = P>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
     }
 }
 
@@ -141,41 +230,39 @@ impl<P> Default for All<P> {
     }
 }
 
-impl<S, R, A, P> Policy<S, R, A> for All<P>
-where
-    P: Policy<S, R, A>,
-{
-    fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
-        let mut decision = PolicyDecision::NotApplicable;
-
-        for policy in &self.0 {
-            decision = decision.and(policy.evaluate(subject, resource, action));
-            if decision == PolicyDecision::Deny {
-                break;
-            }
-        }
-
-        decision
+impl<P> FromIterator<P> for All<P> {
+    fn from_iter<T: IntoIterator<Item = P>>(iter: T) -> Self {
+        Self(iter.into_iter().map(PolicyPredicate).collect())
     }
 }
 
-pub struct Any<P>(Vec<P>);
+impl<S, A, R, P> Policy<S, A, R> for All<P>
+where
+    P: Policy<S, A, R>,
+{
+    fn evaluate(&self, subject: &S, action: &A, resource: &R) -> PolicyDecision {
+        Predicate::evaluate(
+            &self.0,
+            &PolicyContext {
+                subject,
+                action,
+                resource,
+            },
+        )
+    }
+}
+
+pub struct Any<P>(LogicAny<PolicyPredicate<P>>);
 
 impl<P> Any<P> {
     pub const fn new() -> Self {
-        Self(Vec::new())
+        Self(LogicAny::new())
     }
 
     #[must_use]
     pub fn with_policy(mut self, policy: P) -> Self {
-        self.0.push(policy);
+        self.0 = self.0.with_predicate(PolicyPredicate(policy));
         self
-    }
-}
-
-impl<P> FromIterator<P> for Any<P> {
-    fn from_iter<T: IntoIterator<Item = P>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
     }
 }
 
@@ -185,35 +272,24 @@ impl<P> Default for Any<P> {
     }
 }
 
-impl<S, R, A, P> Policy<S, R, A> for Any<P>
-where
-    P: Policy<S, R, A>,
-{
-    fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
-        let mut decision = PolicyDecision::NotApplicable;
-
-        for policy in &self.0 {
-            decision = decision.or(policy.evaluate(subject, resource, action));
-            if decision == PolicyDecision::Permit {
-                break;
-            }
-        }
-
-        decision
+impl<P> FromIterator<P> for Any<P> {
+    fn from_iter<T: IntoIterator<Item = P>>(iter: T) -> Self {
+        Self(iter.into_iter().map(PolicyPredicate).collect())
     }
 }
 
-pub struct FnPolicy<F>(F);
-
-impl<F, S, R, A> Policy<S, R, A> for FnPolicy<F>
+impl<S, A, R, P> Policy<S, A, R> for Any<P>
 where
-    F: Fn(&S, &R, &A) -> PolicyDecision,
+    P: Policy<S, A, R>,
 {
-    fn evaluate(&self, subject: &S, resource: &R, action: &A) -> PolicyDecision {
-        (self.0)(subject, resource, action)
+    fn evaluate(&self, subject: &S, action: &A, resource: &R) -> PolicyDecision {
+        Predicate::evaluate(
+            &self.0,
+            &PolicyContext {
+                subject,
+                action,
+                resource,
+            },
+        )
     }
-}
-
-pub fn policy<F>(f: F) -> FnPolicy<F> {
-    FnPolicy(f)
 }

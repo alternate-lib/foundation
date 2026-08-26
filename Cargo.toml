@@ -3,6 +3,8 @@ resolver = "3"
 members = ["crates/authorization", "crates/codec", "crates/logic"]
 
 [workspace.dependencies]
+alternate-logic.path = "crates/logic"
+
 serde = { version = "1.0.229", features = ["derive"] }
 thiserror = "2.0.20"
 tracing = "0.1.44"
