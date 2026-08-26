@@ -6,6 +6,7 @@ version = 4
 name = "alternate-authorization"
 version = "0.1.0"
 dependencies = [
+ "alternate-logic",
  "thiserror",
 ]
 
@@ -20,6 +21,10 @@ dependencies = [
  "thiserror",
  "tracing",
 ]
+
+[[package]]
+name = "alternate-logic"
+version = "0.1.0"
 
 [[package]]
 name = "autocfg"
