@@ -1,4 +1,4 @@
-use crate::{HasPermission, HasPermissionOn, HasRole, Subject};
+use crate::{Action, HasPermission, HasPermissionOn, HasRole, Subject};
 
 #[derive(Debug, Default)]
 pub struct User {
@@ -47,8 +47,8 @@ pub enum Role {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Permission {
-    Read,
-    Write,
+    PostRead,
+    PostWrite,
 }
 
 impl Subject for User {
@@ -67,27 +67,39 @@ impl HasRole for User {
     }
 }
 
-impl HasPermission<&'static str> for User {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PostAction {
+    Read,
+    Write,
+}
+
+impl Action for PostAction {
     type Permission = Permission;
 
-    fn has_permission(&self, permission: &Permission, _action: &&'static str) -> bool {
+    fn required_permission(&self) -> Self::Permission {
+        match self {
+            PostAction::Read => Permission::PostRead,
+            PostAction::Write => Permission::PostWrite,
+        }
+    }
+}
+
+impl HasPermission for User {
+    type Permission = Permission;
+
+    fn has_permission(&self, permission: &Permission) -> bool {
         self.permissions.contains(permission)
     }
 }
 
-impl HasPermissionOn<&'static str, Post> for User {
+impl HasPermissionOn<Post> for User {
     type Permission = Permission;
 
-    fn has_permission_on(
-        &self,
-        permission: &Permission,
-        _action: &&'static str,
-        resource: &Post,
-    ) -> bool {
+    fn has_permission_on(&self, permission: &Permission, resource: &Post) -> bool {
         self.permissions.contains(permission)
             && match permission {
-                Permission::Read => true,
-                Permission::Write => resource.owner_id == self.id,
+                Permission::PostRead => true,
+                Permission::PostWrite => resource.owner_id == self.id,
             }
     }
 }
