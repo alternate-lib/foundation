@@ -1,5 +1,5 @@
 pub use access::{
-    AccessRequest, ActionRequest, Grant, RequestError, ResourceRequest, SubjectRequest,
+    AccessRequest, ActionRequest, Grant, PrincipalRequest, RequestError, ResourceRequest,
 };
 pub use permission::{Action, HasPermission, HasPermissionOn};
 pub use policy::{Policy, PolicyDecision};

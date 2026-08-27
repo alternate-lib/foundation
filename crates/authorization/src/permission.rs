@@ -20,13 +20,16 @@ pub trait HasPermissionOn<R> {
 
 pub struct RequirePermission;
 
-impl<S, A, R> Policy<S, A, R> for RequirePermission
+impl<P, A> Policy<ActionRequest<P, A>> for RequirePermission
 where
-    S: HasPermission<Permission = A::Permission>,
+    P: HasPermission<Permission = A::Permission>,
     A: Action,
 {
-    fn evaluate(&self, subject: &S, action: &A, _: &R) -> PolicyDecision {
-        if subject.has_permission(&action.required_permission()) {
+    fn evaluate(&self, request: &ActionRequest<P, A>) -> PolicyDecision {
+        if request
+            .principal
+            .has_permission(&request.action.required_permission())
+        {
             return PolicyDecision::Permit;
         }
 
@@ -34,25 +37,28 @@ where
     }
 }
 
-impl<S, A> ActionRequest<S, A>
+impl<P, A> ActionRequest<P, A>
 where
-    S: HasPermission<Permission = A::Permission>,
+    P: HasPermission<Permission = A::Permission>,
     A: Action,
 {
-    pub fn check_action_permission(self) -> Result<Grant<S, A>, RequestError> {
+    pub fn check_action_permission(self) -> Result<Grant<P, A>, RequestError> {
         self.authorize(&RequirePermission)
     }
 }
 
 pub struct RequirePermissionOn;
 
-impl<S, A, R> Policy<S, A, R> for RequirePermissionOn
+impl<P, A, R> Policy<ResourceRequest<P, A, R>> for RequirePermissionOn
 where
-    S: HasPermissionOn<R, Permission = A::Permission>,
+    P: HasPermissionOn<R, Permission = A::Permission>,
     A: Action,
 {
-    fn evaluate(&self, subject: &S, action: &A, resource: &R) -> PolicyDecision {
-        if subject.has_permission_on(&action.required_permission(), resource) {
+    fn evaluate(&self, request: &ResourceRequest<P, A, R>) -> PolicyDecision {
+        if request
+            .principal
+            .has_permission_on(&request.action.required_permission(), &request.resource)
+        {
             PolicyDecision::Permit
         } else {
             PolicyDecision::Deny
@@ -60,12 +66,12 @@ where
     }
 }
 
-impl<S, A, R> ResourceRequest<S, A, R>
+impl<P, A, R> ResourceRequest<P, A, R>
 where
-    S: HasPermissionOn<R, Permission = A::Permission>,
+    P: HasPermissionOn<R, Permission = A::Permission>,
     A: Action,
 {
-    pub fn check_resource_permission(self) -> Result<Grant<S, A, R>, RequestError> {
+    pub fn check_resource_permission(self) -> Result<Grant<P, A, R>, RequestError> {
         self.authorize(&RequirePermissionOn)
     }
 }
@@ -77,16 +83,17 @@ mod tests {
 
     #[test]
     fn grants_access_on_possessing_action_permission() {
-        let result = AccessRequest::for_subject(User::new(1).with_permission(Permission::PostRead))
-            .performing_action(PostAction::Read)
-            .check_action_permission();
+        let result =
+            AccessRequest::for_principal(User::new(1).with_permission(Permission::PostRead))
+                .performing_action(PostAction::Read)
+                .check_action_permission();
 
         assert!(result.is_ok());
     }
 
     #[test]
     fn denies_access_on_missing_action_permission() {
-        let err = AccessRequest::for_subject(User::new(2).with_permission(Permission::PostRead))
+        let err = AccessRequest::for_principal(User::new(2).with_permission(Permission::PostRead))
             .performing_action(PostAction::Write)
             .check_action_permission()
             .unwrap_err();
@@ -96,7 +103,7 @@ mod tests {
 
     #[test]
     fn grants_access_on_posessing_all_action_permissions() {
-        let result = AccessRequest::for_subject(
+        let result = AccessRequest::for_principal(
             User::new(1)
                 .with_permission(Permission::PostRead)
                 .with_permission(Permission::PostWrite),
@@ -109,7 +116,7 @@ mod tests {
 
     #[test]
     fn denies_access_on_missing_some_action_permissions() {
-        let err = AccessRequest::for_subject(User::new(1).with_permission(Permission::PostRead))
+        let err = AccessRequest::for_principal(User::new(1).with_permission(Permission::PostRead))
             .performing_action(PostAction::Write)
             .check_action_permission()
             .unwrap_err();
@@ -120,7 +127,7 @@ mod tests {
     #[test]
     fn grants_access_on_posessing_any_action_permission() {
         let result =
-            AccessRequest::for_subject(User::new(1).with_permission(Permission::PostWrite))
+            AccessRequest::for_principal(User::new(1).with_permission(Permission::PostWrite))
                 .performing_action(PostAction::Write)
                 .check_action_permission();
 
@@ -132,7 +139,7 @@ mod tests {
         let user_id = 1;
 
         let result =
-            AccessRequest::for_subject(User::new(1).with_permission(Permission::PostWrite))
+            AccessRequest::for_principal(User::new(1).with_permission(Permission::PostWrite))
                 .performing_action(PostAction::Write)
                 .on_resource(Post::with_owner(user_id))
                 .check_resource_permission();
@@ -145,7 +152,7 @@ mod tests {
         let user_id = 1;
 
         let err =
-            AccessRequest::for_subject(User::new(user_id).with_permission(Permission::PostRead))
+            AccessRequest::for_principal(User::new(user_id).with_permission(Permission::PostRead))
                 .performing_action(PostAction::Write)
                 .on_resource(Post::with_owner(user_id))
                 .check_resource_permission()

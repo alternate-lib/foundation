@@ -3,37 +3,37 @@ use crate::{Policy, PolicyDecision};
 pub struct AccessRequest;
 
 impl AccessRequest {
-    pub fn for_subject<S>(subject: S) -> SubjectRequest<S> {
-        SubjectRequest { subject }
+    pub fn for_principal<P>(principal: P) -> PrincipalRequest<P> {
+        PrincipalRequest { principal }
     }
 }
 
-pub struct SubjectRequest<S> {
-    subject: S,
+pub struct PrincipalRequest<P> {
+    pub(crate) principal: P,
 }
 
-impl<S> SubjectRequest<S> {
-    pub fn new(subject: S) -> Self {
-        Self { subject }
+impl<P> PrincipalRequest<P> {
+    pub fn new(principal: P) -> Self {
+        Self { principal }
     }
 
     #[must_use]
-    pub fn performing_action<A>(self, action: A) -> ActionRequest<S, A> {
+    pub fn performing_action<A>(self, action: A) -> ActionRequest<P, A> {
         ActionRequest {
-            subject: self.subject,
+            principal: self.principal,
             action,
         }
     }
 }
 
-impl<S> SubjectRequest<S> {
-    pub fn authorize<P>(self, policy: &P) -> Result<Grant<S>, RequestError>
+impl<Pr> PrincipalRequest<Pr> {
+    pub fn authorize<Po>(self, policy: &Po) -> Result<Grant<Pr>, RequestError>
     where
-        P: Policy<S, (), ()>,
+        Po: Policy<Self>,
     {
-        match policy.evaluate(&self.subject, &(), &()) {
+        match policy.evaluate(&self) {
             PolicyDecision::Permit => Ok(Grant {
-                subject: self.subject,
+                principal: self.principal,
                 action: (),
                 resource: (),
             }),
@@ -43,34 +43,36 @@ impl<S> SubjectRequest<S> {
     }
 }
 
-pub struct ActionRequest<S, A> {
-    subject: S,
-    action: A,
+pub struct ActionRequest<P, A> {
+    pub(crate) principal: P,
+    pub(crate) action: A,
 }
 
-impl<S, A> ActionRequest<S, A> {
-    pub fn new(subject: S, action: A) -> Self {
-        Self { subject, action }
+impl<P, A> ActionRequest<P, A> {
+    pub fn new(principal: P, action: A) -> Self {
+        Self { principal, action }
     }
 
     #[must_use]
-    pub fn on_resource<R>(self, resource: R) -> ResourceRequest<S, A, R> {
+    pub fn on_resource<R>(self, resource: R) -> ResourceRequest<P, A, R> {
         ResourceRequest {
-            subject: self.subject,
+            principal: self.principal,
             action: self.action,
             resource,
         }
     }
 }
 
-impl<S, A> ActionRequest<S, A> {
-    pub fn authorize<P>(self, policy: &P) -> Result<Grant<S, A>, RequestError>
+impl<Pr, A> ActionRequest<Pr, A> {
+    pub fn authorize<Po>(self, policy: &Po) -> Result<Grant<Pr, A>, RequestError>
     where
-        P: Policy<S, A, ()>,
+        Po: Policy<Self>,
     {
-        match policy.evaluate(&self.subject, &self.action, &()) {
+        let decision = policy.evaluate(&self);
+
+        match decision {
             PolicyDecision::Permit => Ok(Grant {
-                subject: self.subject,
+                principal: self.principal,
                 action: self.action,
                 resource: (),
             }),
@@ -80,28 +82,30 @@ impl<S, A> ActionRequest<S, A> {
     }
 }
 
-pub struct ResourceRequest<S, A, R> {
-    subject: S,
-    action: A,
-    resource: R,
+pub struct ResourceRequest<P, A, R> {
+    pub(crate) principal: P,
+    pub(crate) action: A,
+    pub(crate) resource: R,
 }
 
-impl<S, A, R> ResourceRequest<S, A, R> {
-    pub fn new(subject: S, action: A, resource: R) -> Self {
+impl<Pr, A, R> ResourceRequest<Pr, A, R> {
+    pub fn new(principal: Pr, action: A, resource: R) -> Self {
         Self {
-            subject,
+            principal,
             action,
             resource,
         }
     }
 
-    pub fn authorize<P>(self, policy: &P) -> Result<Grant<S, A, R>, RequestError>
+    pub fn authorize<Po>(self, policy: &Po) -> Result<Grant<Pr, A, R>, RequestError>
     where
-        P: Policy<S, A, R>,
+        Po: Policy<Self>,
     {
-        match policy.evaluate(&self.subject, &self.action, &self.resource) {
+        let decision = policy.evaluate(&self);
+
+        match decision {
             PolicyDecision::Permit => Ok(Grant {
-                subject: self.subject,
+                principal: self.principal,
                 action: self.action,
                 resource: self.resource,
             }),
@@ -112,15 +116,15 @@ impl<S, A, R> ResourceRequest<S, A, R> {
 }
 
 #[derive(Debug)]
-pub struct Grant<S, A = (), R = ()> {
-    subject: S,
+pub struct Grant<P, A = (), R = ()> {
+    principal: P,
     action: A,
     resource: R,
 }
 
-impl<S, A, R> Grant<S, A, R> {
-    pub fn subject(&self) -> &S {
-        &self.subject
+impl<P, A, R> Grant<P, A, R> {
+    pub fn principal(&self) -> &P {
+        &self.principal
     }
 
     pub fn action(&self) -> &A {
@@ -150,15 +154,15 @@ mod tests {
     };
 
     #[test]
-    fn grants_access_to_subject_for_permitting_policy() {
-        let result = AccessRequest::for_subject(User::new(1)).authorize(&Permit);
+    fn grants_access_to_principal_for_permitting_policy() {
+        let result = AccessRequest::for_principal(User::new(1)).authorize(&Permit);
 
         assert!(result.is_ok());
     }
 
     #[test]
     fn grants_access_to_action_for_permitting_policy() {
-        let result = AccessRequest::for_subject(User::new(1))
+        let result = AccessRequest::for_principal(User::new(1))
             .performing_action("read")
             .authorize(&Permit);
 
@@ -169,7 +173,7 @@ mod tests {
     fn grants_access_to_resource_for_permitting_policy() {
         let resource = "document";
 
-        let grant = AccessRequest::for_subject(User::new(1))
+        let grant = AccessRequest::for_principal(User::new(1))
             .performing_action("read")
             .on_resource(resource)
             .authorize(&Permit)
@@ -180,7 +184,7 @@ mod tests {
 
     #[test]
     fn denies_access_for_denying_policy() {
-        let err = AccessRequest::for_subject(User::new(1))
+        let err = AccessRequest::for_principal(User::new(1))
             .authorize(&Deny)
             .unwrap_err();
 
@@ -189,7 +193,7 @@ mod tests {
 
     #[test]
     fn denies_access_for_not_applicable_policy() {
-        let result = AccessRequest::for_subject(User::new(1))
+        let result = AccessRequest::for_principal(User::new(1))
             .authorize(&NotApplicable)
             .unwrap_err();
 

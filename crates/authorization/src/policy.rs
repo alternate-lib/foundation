@@ -5,8 +5,8 @@ use alternate_logic::{
     },
 };
 
-pub trait Policy<S, A, R> {
-    fn evaluate(&self, subject: &S, action: &A, resource: &R) -> PolicyDecision;
+pub trait Policy<R> {
+    fn evaluate(&self, request: &R) -> PolicyDecision;
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -75,46 +75,43 @@ impl Negation for PolicyLogic {
     }
 }
 
-struct PolicyContext<'a, S, A, R> {
-    subject: &'a S,
-    action: &'a A,
-    resource: &'a R,
+struct PolicyContext<'a, R> {
+    request: &'a R,
 }
 
 struct PolicyPredicate<P>(P);
 
-impl<'a, S, A, R, P> Predicate<PolicyContext<'a, S, A, R>> for PolicyPredicate<P>
+impl<'a, R, P> Predicate<PolicyContext<'a, R>> for PolicyPredicate<P>
 where
-    P: Policy<S, A, R>,
+    P: Policy<R>,
 {
     type Logic = PolicyLogic;
 
-    fn evaluate(&self, context: &PolicyContext<'a, S, A, R>) -> PolicyDecision {
-        self.0
-            .evaluate(context.subject, context.action, context.resource)
+    fn evaluate(&self, context: &PolicyContext<'a, R>) -> PolicyDecision {
+        self.0.evaluate(context.request)
     }
 }
 
 pub struct Permit;
 
-impl<S, A, R> Policy<S, A, R> for Permit {
-    fn evaluate(&self, _: &S, _: &A, _: &R) -> PolicyDecision {
+impl<R> Policy<R> for Permit {
+    fn evaluate(&self, _: &R) -> PolicyDecision {
         PolicyDecision::Permit
     }
 }
 
 pub struct Deny;
 
-impl<S, A, R> Policy<S, A, R> for Deny {
-    fn evaluate(&self, _: &S, _: &A, _: &R) -> PolicyDecision {
+impl<R> Policy<R> for Deny {
+    fn evaluate(&self, _: &R) -> PolicyDecision {
         PolicyDecision::Deny
     }
 }
 
 pub struct NotApplicable;
 
-impl<S, A, R> Policy<S, A, R> for NotApplicable {
-    fn evaluate(&self, _: &S, _: &A, _: &R) -> PolicyDecision {
+impl<R> Policy<R> for NotApplicable {
+    fn evaluate(&self, _: &R) -> PolicyDecision {
         PolicyDecision::NotApplicable
     }
 }
@@ -127,12 +124,12 @@ impl<F> FnPolicy<F> {
     }
 }
 
-impl<S, A, R, F> Policy<S, A, R> for FnPolicy<F>
+impl<R, F> Policy<R> for FnPolicy<F>
 where
-    F: Fn(&S, &A, &R) -> PolicyDecision,
+    F: Fn(&R) -> PolicyDecision,
 {
-    fn evaluate(&self, subject: &S, action: &A, resource: &R) -> PolicyDecision {
-        (self.0)(subject, action, resource)
+    fn evaluate(&self, request: &R) -> PolicyDecision {
+        (self.0)(request)
     }
 }
 
@@ -144,20 +141,13 @@ impl<L, R> And<L, R> {
     }
 }
 
-impl<S, A, Re, L, Ri> Policy<S, A, Re> for And<L, Ri>
+impl<Re, L, Ri> Policy<Re> for And<L, Ri>
 where
-    L: Policy<S, A, Re>,
-    Ri: Policy<S, A, Re>,
+    L: Policy<Re>,
+    Ri: Policy<Re>,
 {
-    fn evaluate(&self, subject: &S, action: &A, resource: &Re) -> PolicyDecision {
-        Predicate::evaluate(
-            &self.0,
-            &PolicyContext {
-                subject,
-                action,
-                resource,
-            },
-        )
+    fn evaluate(&self, request: &Re) -> PolicyDecision {
+        Predicate::evaluate(&self.0, &PolicyContext { request })
     }
 }
 
@@ -169,20 +159,13 @@ impl<L, R> Or<L, R> {
     }
 }
 
-impl<S, A, Re, L, Ri> Policy<S, A, Re> for Or<L, Ri>
+impl<Re, L, Ri> Policy<Re> for Or<L, Ri>
 where
-    L: Policy<S, A, Re>,
-    Ri: Policy<S, A, Re>,
+    L: Policy<Re>,
+    Ri: Policy<Re>,
 {
-    fn evaluate(&self, subject: &S, action: &A, resource: &Re) -> PolicyDecision {
-        Predicate::evaluate(
-            &self.0,
-            &PolicyContext {
-                subject,
-                action,
-                resource,
-            },
-        )
+    fn evaluate(&self, request: &Re) -> PolicyDecision {
+        Predicate::evaluate(&self.0, &PolicyContext { request })
     }
 }
 
@@ -194,19 +177,12 @@ impl<P> Not<P> {
     }
 }
 
-impl<S, A, R, P> Policy<S, A, R> for Not<P>
+impl<R, P> Policy<R> for Not<P>
 where
-    P: Policy<S, A, R>,
+    P: Policy<R>,
 {
-    fn evaluate(&self, subject: &S, action: &A, resource: &R) -> PolicyDecision {
-        Predicate::evaluate(
-            &self.0,
-            &PolicyContext {
-                subject,
-                action,
-                resource,
-            },
-        )
+    fn evaluate(&self, request: &R) -> PolicyDecision {
+        Predicate::evaluate(&self.0, &PolicyContext { request })
     }
 }
 
@@ -236,19 +212,12 @@ impl<P> FromIterator<P> for All<P> {
     }
 }
 
-impl<S, A, R, P> Policy<S, A, R> for All<P>
+impl<R, P> Policy<R> for All<P>
 where
-    P: Policy<S, A, R>,
+    P: Policy<R>,
 {
-    fn evaluate(&self, subject: &S, action: &A, resource: &R) -> PolicyDecision {
-        Predicate::evaluate(
-            &self.0,
-            &PolicyContext {
-                subject,
-                action,
-                resource,
-            },
-        )
+    fn evaluate(&self, request: &R) -> PolicyDecision {
+        Predicate::evaluate(&self.0, &PolicyContext { request })
     }
 }
 
@@ -278,19 +247,12 @@ impl<P> FromIterator<P> for Any<P> {
     }
 }
 
-impl<S, A, R, P> Policy<S, A, R> for Any<P>
+impl<R, P> Policy<R> for Any<P>
 where
-    P: Policy<S, A, R>,
+    P: Policy<R>,
 {
-    fn evaluate(&self, subject: &S, action: &A, resource: &R) -> PolicyDecision {
-        Predicate::evaluate(
-            &self.0,
-            &PolicyContext {
-                subject,
-                action,
-                resource,
-            },
-        )
+    fn evaluate(&self, request: &R) -> PolicyDecision {
+        Predicate::evaluate(&self.0, &PolicyContext { request })
     }
 }
 
@@ -298,13 +260,11 @@ where
 mod tests {
     use super::*;
 
-    fn decision(p: &impl Policy<(), (), ()>) -> PolicyDecision {
-        p.evaluate(&(), &(), &())
+    fn decision(p: &impl Policy<()>) -> PolicyDecision {
+        p.evaluate(&())
     }
 
-    fn fn_policy(
-        f: fn(&(), &(), &()) -> PolicyDecision,
-    ) -> FnPolicy<fn(&(), &(), &()) -> PolicyDecision> {
+    fn fn_policy(f: fn(&()) -> PolicyDecision) -> FnPolicy<fn(&()) -> PolicyDecision> {
         FnPolicy(f)
     }
 
@@ -406,8 +366,7 @@ mod tests {
 
     #[test]
     fn short_circuits_conjunction_on_denying_policy() {
-        let panic_if_evaluated =
-            fn_policy(|(), (), ()| panic!("right side of And must not be evaluated"));
+        let panic_if_evaluated = fn_policy(|()| panic!("right side of And must not be evaluated"));
 
         assert_eq!(
             decision(&And::new(Deny, panic_if_evaluated)),
@@ -417,8 +376,7 @@ mod tests {
 
     #[test]
     fn short_circuits_disjunction_on_permitting_policy() {
-        let panic_if_evaluated =
-            fn_policy(|(), (), ()| panic!("right side of Or must not be evaluated"));
+        let panic_if_evaluated = fn_policy(|()| panic!("right side of Or must not be evaluated"));
 
         assert_eq!(
             decision(&Or::new(Permit, panic_if_evaluated)),

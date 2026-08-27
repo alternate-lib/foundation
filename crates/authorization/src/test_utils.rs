@@ -1,6 +1,6 @@
 use crate::{Action, HasPermission, HasPermissionOn, HasRole};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct User {
     id: u32,
     roles: Vec<Role>,
@@ -88,7 +88,7 @@ impl HasPermissionOn<Post> for User {
     type Permission = Permission;
 
     fn has_permission_on(&self, permission: &Permission, resource: &Post) -> bool {
-        self.permissions.contains(permission)
+        self.has_permission(permission)
             && match permission {
                 Permission::PostRead => true,
                 Permission::PostWrite => resource.owner_id == self.id,
