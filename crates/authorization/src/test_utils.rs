@@ -1,4 +1,4 @@
-use crate::{Action, HasPermission, HasPermissionOn, HasRole, Subject};
+use crate::{Action, HasPermission, HasPermissionOn, HasRole};
 
 #[derive(Debug, Default)]
 pub struct User {
@@ -49,14 +49,6 @@ pub enum Role {
 pub enum Permission {
     PostRead,
     PostWrite,
-}
-
-impl Subject for User {
-    type Identity = u32;
-
-    fn identity(&self) -> Self::Identity {
-        self.id
-    }
 }
 
 impl HasRole for User {

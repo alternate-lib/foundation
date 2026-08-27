@@ -1,4 +1,4 @@
-use crate::{ActionRequest, Grant, Policy, PolicyDecision, RequestError, ResourceRequest, Subject};
+use crate::{ActionRequest, Grant, Policy, PolicyDecision, RequestError, ResourceRequest};
 
 pub trait Action {
     type Permission: Eq;
@@ -6,13 +6,13 @@ pub trait Action {
     fn required_permission(&self) -> Self::Permission;
 }
 
-pub trait HasPermission: Subject {
+pub trait HasPermission {
     type Permission: Eq;
 
     fn has_permission(&self, permission: &Self::Permission) -> bool;
 }
 
-pub trait HasPermissionOn<R>: Subject {
+pub trait HasPermissionOn<R> {
     type Permission: Eq;
 
     fn has_permission_on(&self, permission: &Self::Permission, resource: &R) -> bool;

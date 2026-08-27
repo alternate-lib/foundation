@@ -1,15 +1,9 @@
 use crate::{Policy, PolicyDecision};
 
-pub trait Subject {
-    type Identity: Copy + Eq + 'static;
-
-    fn identity(&self) -> Self::Identity;
-}
-
 pub struct AccessRequest;
 
 impl AccessRequest {
-    pub fn for_subject<S: Subject>(subject: S) -> SubjectRequest<S> {
+    pub fn for_subject<S>(subject: S) -> SubjectRequest<S> {
         SubjectRequest { subject }
     }
 }
@@ -32,7 +26,7 @@ impl<S> SubjectRequest<S> {
     }
 }
 
-impl<S: Subject> SubjectRequest<S> {
+impl<S> SubjectRequest<S> {
     pub fn authorize<P>(self, policy: &P) -> Result<Grant<S>, RequestError>
     where
         P: Policy<S, (), ()>,
@@ -69,7 +63,7 @@ impl<S, A> ActionRequest<S, A> {
     }
 }
 
-impl<S: Subject, A> ActionRequest<S, A> {
+impl<S, A> ActionRequest<S, A> {
     pub fn authorize<P>(self, policy: &P) -> Result<Grant<S, A>, RequestError>
     where
         P: Policy<S, A, ()>,
@@ -92,7 +86,7 @@ pub struct ResourceRequest<S, A, R> {
     resource: R,
 }
 
-impl<S: Subject, A, R> ResourceRequest<S, A, R> {
+impl<S, A, R> ResourceRequest<S, A, R> {
     pub fn new(subject: S, action: A, resource: R) -> Self {
         Self {
             subject,
