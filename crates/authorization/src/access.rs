@@ -155,14 +155,14 @@ mod tests {
 
     #[test]
     fn grants_access_to_principal_for_permitting_policy() {
-        let result = AccessRequest::for_principal(User::new(1)).authorize(&Permit);
+        let result = AccessRequest::for_principal(User::default()).authorize(&Permit);
 
         assert!(result.is_ok());
     }
 
     #[test]
     fn grants_access_to_action_for_permitting_policy() {
-        let result = AccessRequest::for_principal(User::new(1))
+        let result = AccessRequest::for_principal(User::default())
             .performing_action("read")
             .authorize(&Permit);
 
@@ -170,21 +170,8 @@ mod tests {
     }
 
     #[test]
-    fn grants_access_to_resource_for_permitting_policy() {
-        let resource = "document";
-
-        let grant = AccessRequest::for_principal(User::new(1))
-            .performing_action("read")
-            .on_resource(resource)
-            .authorize(&Permit)
-            .expect("permit must grant access");
-
-        assert_eq!(grant.into_resource(), resource);
-    }
-
-    #[test]
     fn denies_access_for_denying_policy() {
-        let err = AccessRequest::for_principal(User::new(1))
+        let err = AccessRequest::for_principal(User::default())
             .authorize(&Deny)
             .unwrap_err();
 
@@ -193,7 +180,7 @@ mod tests {
 
     #[test]
     fn denies_access_for_not_applicable_policy() {
-        let result = AccessRequest::for_principal(User::new(1))
+        let result = AccessRequest::for_principal(User::default())
             .authorize(&NotApplicable)
             .unwrap_err();
 

@@ -1,4 +1,4 @@
-use crate::{Action, HasPermission, HasPermissionOn, HasRole};
+use crate::{Action, Grants, Permits, RoleSet};
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct User {
@@ -8,14 +8,6 @@ pub struct User {
 }
 
 impl User {
-    pub fn new(id: u32) -> Self {
-        Self {
-            id,
-            roles: Vec::new(),
-            permissions: Vec::new(),
-        }
-    }
-
     pub fn with_role(mut self, role: Role) -> Self {
         self.roles.push(role);
         self
@@ -27,17 +19,6 @@ impl User {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct Post {
-    owner_id: u32,
-}
-
-impl Post {
-    pub fn with_owner(owner_id: u32) -> Self {
-        Self { owner_id }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Role {
     User,
@@ -46,23 +27,23 @@ pub enum Role {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PostAction {
+    Read,
+    Write,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Permission {
     PostRead,
     PostWrite,
 }
 
-impl HasRole for User {
+impl RoleSet for User {
     type Role = Role;
 
-    fn has_role(&self, role: &Role) -> bool {
-        self.roles.contains(role)
+    fn roles(&self) -> impl Iterator<Item = &Self::Role> {
+        self.roles.iter()
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PostAction {
-    Read,
-    Write,
 }
 
 impl Action for PostAction {
@@ -76,22 +57,20 @@ impl Action for PostAction {
     }
 }
 
-impl HasPermission for User {
-    type Permission = Permission;
-
-    fn has_permission(&self, permission: &Permission) -> bool {
-        self.permissions.contains(permission)
+impl Grants<Permission> for Role {
+    fn grants(&self, permission: &Permission) -> bool {
+        matches!(
+            (self, permission),
+            (
+                Role::Admin | Role::Editor,
+                Permission::PostRead | Permission::PostWrite
+            ) | (Role::User, Permission::PostRead)
+        )
     }
 }
 
-impl HasPermissionOn<Post> for User {
-    type Permission = Permission;
-
-    fn has_permission_on(&self, permission: &Permission, resource: &Post) -> bool {
-        self.has_permission(permission)
-            && match permission {
-                Permission::PostRead => true,
-                Permission::PostWrite => resource.owner_id == self.id,
-            }
+impl Permits<Permission> for User {
+    fn permits(&self, permission: &Permission) -> bool {
+        self.permissions.contains(permission)
     }
 }

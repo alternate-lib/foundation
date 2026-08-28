@@ -1,9 +1,9 @@
 pub use access::{
     AccessRequest, ActionRequest, Grant, PrincipalRequest, RequestError, ResourceRequest,
 };
-pub use permission::{Action, HasPermission, HasPermissionOn};
+pub use permission::{Action, Grants, Permits};
 pub use policy::{Policy, PolicyDecision};
-pub use role::HasRole;
+pub use role::RoleSet;
 
 pub mod access;
 pub mod permission;

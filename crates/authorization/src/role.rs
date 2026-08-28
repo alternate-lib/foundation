@@ -3,10 +3,14 @@ use crate::{
     policy::{All, Any},
 };
 
-pub trait HasRole {
-    type Role: Eq;
+pub trait RoleSet {
+    type Role: PartialEq;
 
-    fn has_role(&self, role: &Self::Role) -> bool;
+    fn roles(&self) -> impl Iterator<Item = &Self::Role>;
+
+    fn has_role(&self, role: &Self::Role) -> bool {
+        self.roles().any(|r| r == role)
+    }
 }
 
 pub struct RequireRole<R>(R);
@@ -17,10 +21,7 @@ impl<R> RequireRole<R> {
     }
 }
 
-impl<P, R> Policy<PrincipalRequest<P>> for RequireRole<R>
-where
-    P: HasRole<Role = R>,
-{
+impl<P: RoleSet> Policy<PrincipalRequest<P>> for RequireRole<P::Role> {
     fn evaluate(&self, request: &PrincipalRequest<P>) -> PolicyDecision {
         if request.principal.has_role(&self.0) {
             return PolicyDecision::Permit;
@@ -30,10 +31,7 @@ where
     }
 }
 
-impl<P> PrincipalRequest<P>
-where
-    P: HasRole,
-{
+impl<P: RoleSet> PrincipalRequest<P> {
     pub fn check_role(self, role: P::Role) -> Result<Grant<P>, RequestError> {
         self.authorize(&RequireRole::new(role))
     }
@@ -63,9 +61,9 @@ mod tests {
     use crate::{AccessRequest, test_utils::*};
 
     #[test]
-    fn grants_access_on_posessing_role() {
-        let result =
-            AccessRequest::for_principal(User::new(1).with_role(Role::User)).check_role(Role::User);
+    fn grants_access_on_possessing_role() {
+        let result = AccessRequest::for_principal(User::default().with_role(Role::User))
+            .check_role(Role::User);
 
         assert!(result.is_ok());
     }
@@ -80,9 +78,11 @@ mod tests {
     }
 
     #[test]
-    fn grants_access_on_posessing_all_roles() {
+    fn grants_access_on_possessing_all_roles() {
         let result = AccessRequest::for_principal(
-            User::new(1).with_role(Role::User).with_role(Role::Editor),
+            User::default()
+                .with_role(Role::User)
+                .with_role(Role::Editor),
         )
         .check_all_roles([Role::User, Role::Editor]);
 
@@ -91,7 +91,7 @@ mod tests {
 
     #[test]
     fn denies_access_on_missing_some_roles() {
-        let err = AccessRequest::for_principal(User::new(1).with_role(Role::User))
+        let err = AccessRequest::for_principal(User::default().with_role(Role::User))
             .check_all_roles([Role::User, Role::Editor])
             .unwrap_err();
 
@@ -99,8 +99,8 @@ mod tests {
     }
 
     #[test]
-    fn grants_access_on_posessing_any_role() {
-        let result = AccessRequest::for_principal(User::new(1).with_role(Role::User))
+    fn grants_access_on_possessing_any_role() {
+        let result = AccessRequest::for_principal(User::default().with_role(Role::User))
             .check_any_role([Role::User, Role::Editor]);
 
         assert!(result.is_ok());
