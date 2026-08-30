@@ -1,4 +1,4 @@
-use crate::{Action, Grants, Permits, RoleSet};
+use crate::{Action, Grants, ImpliedRoles, Permits, RoleSet};
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct User {
@@ -38,6 +38,16 @@ pub enum Permission {
     PostWrite,
 }
 
+impl ImpliedRoles for Role {
+    fn parents(&self) -> impl Iterator<Item = &Self> {
+        match self {
+            Role::Admin => [Role::Editor].iter(),
+            Role::Editor => [Role::User].iter(),
+            Role::User => [].iter(),
+        }
+    }
+}
+
 impl RoleSet for User {
     type Role = Role;
 
@@ -61,10 +71,7 @@ impl Grants<Permission> for Role {
     fn grants(&self, permission: &Permission) -> bool {
         matches!(
             (self, permission),
-            (
-                Role::Admin | Role::Editor,
-                Permission::PostRead | Permission::PostWrite
-            ) | (Role::User, Permission::PostRead)
+            (Role::Editor, Permission::PostWrite) | (Role::User, Permission::PostRead)
         )
     }
 }

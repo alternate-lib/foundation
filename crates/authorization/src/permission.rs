@@ -1,4 +1,7 @@
-use crate::{ActionRequest, Grant, Policy, PolicyDecision, RequestError, RoleSet, policy::Or};
+use crate::{
+    ActionRequest, Grant, ImpliedRoles as _, Policy, PolicyDecision, RequestError, RoleSet,
+    policy::Or,
+};
 
 pub trait Action {
     type Permission;
@@ -42,11 +45,11 @@ where
     A: Action,
 {
     fn evaluate(&self, request: &ActionRequest<P, A>) -> PolicyDecision {
-        if request
-            .principal
-            .roles()
-            .any(|role| role.grants(&request.action.required_permission()))
-        {
+        if request.principal.roles().any(|assigned| {
+            assigned
+                .implied_roles()
+                .any(|role| role.grants(&request.action.required_permission()))
+        }) {
             return PolicyDecision::Permit;
         }
 

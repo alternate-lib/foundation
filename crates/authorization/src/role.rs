@@ -3,13 +3,36 @@ use crate::{
     policy::{All, Any},
 };
 
+pub trait ImpliedRoles: Clone + PartialEq {
+    fn parents(&self) -> impl Iterator<Item = &Self> {
+        std::iter::empty()
+    }
+
+    fn implied_roles(&self) -> impl Iterator<Item = &Self> {
+        let mut pending = vec![self];
+        let mut implied = Vec::new();
+
+        while let Some(role) = pending.pop() {
+            if implied.iter().any(|known| known == &role) {
+                continue;
+            }
+
+            pending.extend(role.parents());
+            implied.push(role);
+        }
+
+        implied.into_iter()
+    }
+}
+
 pub trait RoleSet {
-    type Role: PartialEq;
+    type Role: ImpliedRoles;
 
     fn roles(&self) -> impl Iterator<Item = &Self::Role>;
 
     fn has_role(&self, role: &Self::Role) -> bool {
-        self.roles().any(|r| r == role)
+        self.roles()
+            .any(|assigned| assigned.implied_roles().any(|r| r == role))
     }
 }
 
@@ -64,6 +87,14 @@ mod tests {
     fn grants_access_on_possessing_role() {
         let result = AccessRequest::for_principal(User::default().with_role(Role::User))
             .check_role(Role::User);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn grants_access_on_inherited_role() {
+        let result = AccessRequest::for_principal(User::default().with_role(Role::Admin))
+            .check_role(Role::Editor);
 
         assert!(result.is_ok());
     }

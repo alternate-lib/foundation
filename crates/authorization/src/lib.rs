@@ -3,7 +3,7 @@ pub use access::{
 };
 pub use permission::{Action, Grants, Permits};
 pub use policy::{Policy, PolicyDecision};
-pub use role::RoleSet;
+pub use role::{ImpliedRoles, RoleSet};
 
 pub mod access;
 pub mod permission;
