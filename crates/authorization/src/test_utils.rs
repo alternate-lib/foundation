@@ -1,4 +1,4 @@
-use crate::{Action, Grants, ImpliedRoles, Permits, RoleSet};
+use crate::{Action, Grants, ImpliedRoles, Permits, Relates, RoleSet};
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct User {
@@ -8,6 +8,14 @@ pub struct User {
 }
 
 impl User {
+    pub fn new(id: u32) -> Self {
+        Self {
+            id,
+            roles: Vec::new(),
+            permissions: Vec::new(),
+        }
+    }
+
     pub fn with_role(mut self, role: Role) -> Self {
         self.roles.push(role);
         self
@@ -16,6 +24,10 @@ impl User {
     pub fn with_permission(mut self, permission: Permission) -> Self {
         self.permissions.push(permission);
         self
+    }
+
+    pub fn id(&self) -> u32 {
+        self.id
     }
 }
 
@@ -79,5 +91,22 @@ impl Grants<Permission> for Role {
 impl Permits<Permission> for User {
     fn permits(&self, permission: &Permission) -> bool {
         self.permissions.contains(permission)
+    }
+}
+
+#[derive(Debug)]
+pub struct Post {
+    owner_id: u32,
+}
+
+impl Post {
+    pub const fn with_owner(owner_id: u32) -> Self {
+        Self { owner_id }
+    }
+}
+
+impl Relates<Post> for User {
+    fn relates(&self, post: &Post) -> bool {
+        post.owner_id == self.id
     }
 }

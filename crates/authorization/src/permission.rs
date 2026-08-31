@@ -1,6 +1,6 @@
 use crate::{
-    ActionRequest, Grant, ImpliedRoles as _, Policy, PolicyDecision, RequestError, RoleSet,
-    policy::Or,
+    ActionRequest, Grant, ImpliedRoles as _, Policy, PolicyDecision, RequestError, ResourceRequest,
+    RoleSet, policy::Or,
 };
 
 pub trait Action {
@@ -36,6 +36,23 @@ where
     }
 }
 
+impl<P, A, R> Policy<ResourceRequest<P, A, R>> for RequireDirectPermission
+where
+    P: Permits<A::Permission>,
+    A: Action,
+{
+    fn evaluate(&self, request: &ResourceRequest<P, A, R>) -> PolicyDecision {
+        if request
+            .principal
+            .permits(&request.action.required_permission())
+        {
+            return PolicyDecision::Permit;
+        }
+
+        PolicyDecision::Deny
+    }
+}
+
 pub struct RequirePermissionViaRole;
 
 impl<P, A> Policy<ActionRequest<P, A>> for RequirePermissionViaRole
@@ -57,6 +74,25 @@ where
     }
 }
 
+impl<P, A, R> Policy<ResourceRequest<P, A, R>> for RequirePermissionViaRole
+where
+    P: RoleSet,
+    <P as RoleSet>::Role: Grants<A::Permission>,
+    A: Action,
+{
+    fn evaluate(&self, request: &ResourceRequest<P, A, R>) -> PolicyDecision {
+        if request.principal.roles().any(|assigned| {
+            assigned
+                .implied_roles()
+                .any(|role| role.grants(&request.action.required_permission()))
+        }) {
+            return PolicyDecision::Permit;
+        }
+
+        PolicyDecision::Deny
+    }
+}
+
 impl<P, A> ActionRequest<P, A>
 where
     P: RoleSet + Permits<A::Permission>,
@@ -64,6 +100,17 @@ where
     A: Action,
 {
     pub fn check_permission(self) -> Result<Grant<P, A>, RequestError> {
+        self.authorize(&Or::new(RequireDirectPermission, RequirePermissionViaRole))
+    }
+}
+
+impl<P, A, R> ResourceRequest<P, A, R>
+where
+    P: RoleSet + Permits<A::Permission>,
+    <P as RoleSet>::Role: Grants<A::Permission>,
+    A: Action,
+{
+    pub fn check_permission(self) -> Result<Grant<P, A, R>, RequestError> {
         self.authorize(&Or::new(RequireDirectPermission, RequirePermissionViaRole))
     }
 }

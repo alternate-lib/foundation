@@ -24,6 +24,15 @@ impl<P> PrincipalRequest<P> {
             action,
         }
     }
+
+    #[must_use]
+    pub fn using_resource<R>(self, resource: R) -> ResourceRequest<P, (), R> {
+        ResourceRequest {
+            principal: self.principal,
+            action: (),
+            resource,
+        }
+    }
 }
 
 impl<Pr> PrincipalRequest<Pr> {
