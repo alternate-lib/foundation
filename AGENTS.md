@@ -8,7 +8,9 @@ A Cargo workspace containing foundational crates for application development. Pr
 
 ```
 crates/
-├── authorization/  – policy evaluation, access requests, roles, permissions, relations
+├── authorization/  – authorization abstraction (policy evaluation, access requests, roles, permissions, relations)
 ├── codec/          – data serialization abstraction (binary, JSON, MessagePack)
-└── logic/          – truth tables, predicate evaluation, logic combinators
+├── crypto/         – crypto utilities (csprng, digest, encoding)
+├── domain/         – DDD abstractions (entities, aggregate roots, events, repositories, use cases)
+└── logic/          – logic abstractions (truth tables, predicate evaluation, logic combinators)
 ```
