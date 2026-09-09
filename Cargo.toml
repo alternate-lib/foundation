@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/authorization", "crates/codec", "crates/logic"]
+members = ["crates/authorization", "crates/codec", "crates/crypto", "crates/logic"]
 
 [workspace.dependencies]
 alternate-logic.path = "crates/logic"
