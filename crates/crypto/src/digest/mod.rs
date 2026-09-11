@@ -49,3 +49,11 @@ pub trait Hash {
 
     fn hash(message: &[u8]) -> Self::Output;
 }
+
+pub trait Hasher {
+    type Output: AsRef<[u8]>;
+
+    fn update(&mut self, message: &[u8]) -> &mut Self;
+
+    fn finalize(self) -> Self::Output;
+}
