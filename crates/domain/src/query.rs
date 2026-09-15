@@ -1,17 +1,17 @@
-pub trait QueryRepository<Dto: Cursor> {
-    type Params;
-    type Key: IntoQuery<Params = Self::Params>;
+pub trait QueryRepository<Dto: Cursor>: Sync {
+    type Query: Send;
+    type Key: IntoQuery<Query = Self::Query> + Send;
     type Error: std::error::Error;
 
     fn query(
         &self,
-        params: QueryParams<Self::Params>,
-    ) -> impl Future<Output = Result<Vec<Dto>, Self::Error>>;
+        params: QueryParams<Self::Query>,
+    ) -> impl Future<Output = Result<Vec<Dto>, Self::Error>> + Send;
 
     fn query_by_key(
         &self,
         key: Self::Key,
-    ) -> impl Future<Output = Result<Option<Dto>, Self::Error>> {
+    ) -> impl Future<Output = Result<Option<Dto>, Self::Error>> + Send {
         async move {
             self.query(QueryParams {
                 base: key.into_query(),
@@ -25,8 +25,8 @@ pub trait QueryRepository<Dto: Cursor> {
 
     fn paginate(
         &self,
-        params: QueryParams<Self::Params>,
-    ) -> impl Future<Output = Result<Paginated<Dto>, Self::Error>> {
+        params: QueryParams<Self::Query>,
+    ) -> impl Future<Output = Result<Paginated<Dto>, Self::Error>> + Send {
         async move {
             let mut items = self
                 .query(QueryParams {
@@ -87,7 +87,7 @@ impl<I: Cursor> Default for Paginated<I> {
 }
 
 pub trait IntoQuery {
-    type Params;
+    type Query;
 
-    fn into_query(self) -> Self::Params;
+    fn into_query(self) -> Self::Query;
 }
