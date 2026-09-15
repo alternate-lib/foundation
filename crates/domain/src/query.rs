@@ -1,11 +1,14 @@
-pub trait QueryRepository<Dto: Cursor>: Sync {
+pub trait QueryRepository<Dto: Cursor>: Sync
+where
+    Dto::Data: Send,
+{
     type Query: Send;
     type Key: IntoQuery<Query = Self::Query> + Send;
     type Error: std::error::Error;
 
     fn query(
         &self,
-        params: QueryParams<Self::Query>,
+        params: QueryParams<Self::Query, Dto>,
     ) -> impl Future<Output = Result<Vec<Dto>, Self::Error>> + Send;
 
     fn query_by_key(
@@ -25,9 +28,11 @@ pub trait QueryRepository<Dto: Cursor>: Sync {
 
     fn paginate(
         &self,
-        params: QueryParams<Self::Query>,
+        params: QueryParams<Self::Query, Dto>,
     ) -> impl Future<Output = Result<Paginated<Dto>, Self::Error>> + Send {
         async move {
+            let has_cursor = params.cursor.is_some();
+
             let mut items = self
                 .query(QueryParams {
                     base: params.base,
@@ -39,7 +44,7 @@ pub trait QueryRepository<Dto: Cursor>: Sync {
             let mut cursor = None;
 
             if let Some(limit) = params.limit
-                && params.cursor.is_some()
+                && has_cursor
                 && items.len() > limit
             {
                 items = items.into_iter().take(limit).collect();
@@ -65,6 +70,7 @@ impl Cursor for () {
     fn to_cursor(&self) -> Self::Data {}
 }
 
+#[derive(Debug)]
 pub struct QueryParams<P, C: Cursor = ()> {
     pub base: P,
     pub cursor: Option<C::Data>,

@@ -61,5 +61,5 @@ pub enum RepositoryError<InnerErr: std::error::Error> {
     StaleVersion,
 
     #[error(transparent)]
-    Other(#[from] InnerErr),
+    Inner(#[from] InnerErr),
 }
