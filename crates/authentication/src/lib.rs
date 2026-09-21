@@ -3,8 +3,8 @@ pub use identity::{
     AuthenticatedIdentity, CredentialContext, CredentialId, CredentialRestrictions,
     CredentialScope, Issuer, Subject, SubjectId,
 };
-pub use resolver::{ContextResolver, ResolverError};
-pub use verifier::{CredentialVerifier, VerifierError};
+pub use resolver::{ContextResolver, ContextResolverError};
+pub use verifier::{CredentialVerifier, CredentialVerifierError};
 
 pub mod credential;
 pub mod identity;
