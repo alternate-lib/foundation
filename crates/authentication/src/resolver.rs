@@ -1,13 +1,14 @@
-use crate::AuthenticatedIdentity;
+use crate::VerifiedCredential;
 
 pub trait ContextResolver {
+    type Evidence;
     type Scope;
     type Context;
     type BackendError: std::error::Error;
 
     fn resolve(
         &self,
-        identity: AuthenticatedIdentity,
+        credential: VerifiedCredential<Self::Evidence>,
         scope: Self::Scope,
     ) -> impl Future<Output = Result<Self::Context, ContextResolverError<Self::BackendError>>> + Send;
 }

@@ -1,13 +1,17 @@
-use crate::{AuthenticatedIdentity, Credential};
+use crate::{Credential, VerifiedCredential};
 
 pub trait CredentialVerifier {
+    type Evidence;
     type BackendError: std::error::Error;
 
     fn verify(
         &self,
         credential: Credential,
     ) -> impl Future<
-        Output = Result<AuthenticatedIdentity, CredentialVerifierError<Self::BackendError>>,
+        Output = Result<
+            VerifiedCredential<Self::Evidence>,
+            CredentialVerifierError<Self::BackendError>,
+        >,
     > + Send;
 }
 
