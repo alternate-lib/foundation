@@ -38,7 +38,7 @@ where
 }
 
 impl<P, A, R> ResourceRequest<P, A, R> {
-    pub fn check_relation<Kind>(self) -> Result<Grant<P, A, R>, RequestError>
+    pub fn check_relation<Kind>(self) -> Result<Grant<Self>, RequestError>
     where
         P: Relates<R, Kind>,
     {
@@ -52,7 +52,7 @@ where
     P::Role: Grants<A::Permission>,
     A: Action,
 {
-    pub fn check_relation_and_permission<Kind>(self) -> Result<Grant<P, A, R>, RequestError>
+    pub fn check_relation_and_permission<Kind>(self) -> Result<Grant<Self>, RequestError>
     where
         P: Relates<R, Kind>,
     {

@@ -99,7 +99,7 @@ where
     <P as RoleSet>::Role: Grants<A::Permission>,
     A: Action,
 {
-    pub fn check_permission(self) -> Result<Grant<P, A>, RequestError> {
+    pub fn check_permission(self) -> Result<Grant<Self>, RequestError> {
         self.authorize(&Or::new(RequireDirectPermission, RequirePermissionViaRole))
     }
 }
@@ -110,7 +110,7 @@ where
     <P as RoleSet>::Role: Grants<A::Permission>,
     A: Action,
 {
-    pub fn check_permission(self) -> Result<Grant<P, A, R>, RequestError> {
+    pub fn check_permission(self) -> Result<Grant<Self>, RequestError> {
         self.authorize(&Or::new(RequireDirectPermission, RequirePermissionViaRole))
     }
 }

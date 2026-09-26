@@ -8,6 +8,7 @@ impl AccessRequest {
     }
 }
 
+#[derive(Debug)]
 pub struct PrincipalRequest<P> {
     principal: P,
 }
@@ -36,19 +37,8 @@ impl<P> PrincipalRequest<P> {
 }
 
 impl<Pr> PrincipalRequest<Pr> {
-    pub fn authorize<Po>(self, policy: &Po) -> Result<Grant<Pr>, RequestError>
-    where
-        Po: Policy<Self>,
-    {
-        match policy.evaluate(&self) {
-            PolicyDecision::Permit => Ok(Grant {
-                principal: self.principal,
-                action: (),
-                resource: (),
-            }),
-            PolicyDecision::Deny => Err(RequestError::Denied),
-            PolicyDecision::NotApplicable => Err(RequestError::NotApplicable),
-        }
+    pub fn authorize<Po: Policy<Self>>(self, policy: &Po) -> Result<Grant<Self>, RequestError> {
+        Grant::authorize(self, policy)
     }
 
     pub fn principal(&self) -> &Pr {
@@ -56,6 +46,7 @@ impl<Pr> PrincipalRequest<Pr> {
     }
 }
 
+#[derive(Debug)]
 pub struct ActionRequest<P, A> {
     principal: P,
     action: A,
@@ -77,21 +68,8 @@ impl<P, A> ActionRequest<P, A> {
 }
 
 impl<Pr, A> ActionRequest<Pr, A> {
-    pub fn authorize<Po>(self, policy: &Po) -> Result<Grant<Pr, A>, RequestError>
-    where
-        Po: Policy<Self>,
-    {
-        let decision = policy.evaluate(&self);
-
-        match decision {
-            PolicyDecision::Permit => Ok(Grant {
-                principal: self.principal,
-                action: self.action,
-                resource: (),
-            }),
-            PolicyDecision::Deny => Err(RequestError::Denied),
-            PolicyDecision::NotApplicable => Err(RequestError::NotApplicable),
-        }
+    pub fn authorize<Po: Policy<Self>>(self, policy: &Po) -> Result<Grant<Self>, RequestError> {
+        Grant::authorize(self, policy)
     }
 
     pub fn principal(&self) -> &Pr {
@@ -103,6 +81,7 @@ impl<Pr, A> ActionRequest<Pr, A> {
     }
 }
 
+#[derive(Debug)]
 pub struct ResourceRequest<P, A, R> {
     principal: P,
     action: A,
@@ -118,21 +97,8 @@ impl<Pr, A, R> ResourceRequest<Pr, A, R> {
         }
     }
 
-    pub fn authorize<Po>(self, policy: &Po) -> Result<Grant<Pr, A, R>, RequestError>
-    where
-        Po: Policy<Self>,
-    {
-        let decision = policy.evaluate(&self);
-
-        match decision {
-            PolicyDecision::Permit => Ok(Grant {
-                principal: self.principal,
-                action: self.action,
-                resource: self.resource,
-            }),
-            PolicyDecision::Deny => Err(RequestError::Denied),
-            PolicyDecision::NotApplicable => Err(RequestError::NotApplicable),
-        }
+    pub fn authorize<Po: Policy<Self>>(self, policy: &Po) -> Result<Grant<Self>, RequestError> {
+        Grant::authorize(self, policy)
     }
 
     pub fn principal(&self) -> &Pr {
@@ -149,27 +115,53 @@ impl<Pr, A, R> ResourceRequest<Pr, A, R> {
 }
 
 #[derive(Debug)]
-pub struct Grant<P, A = (), R = ()> {
-    principal: P,
-    action: A,
-    resource: R,
+pub struct Grant<R>(R);
+
+impl<R> Grant<R> {
+    pub fn authorize<P: Policy<R>>(request: R, policy: &P) -> Result<Self, RequestError> {
+        match policy.evaluate(&request) {
+            PolicyDecision::Permit => Ok(Self(request)),
+            PolicyDecision::Deny => Err(RequestError::Denied),
+            PolicyDecision::NotApplicable => Err(RequestError::NotApplicable),
+        }
+    }
+
+    pub fn request(&self) -> &R {
+        &self.0
+    }
+
+    pub fn into_request(self) -> R {
+        self.0
+    }
 }
 
-impl<P, A, R> Grant<P, A, R> {
+impl<P> Grant<PrincipalRequest<P>> {
     pub fn principal(&self) -> &P {
-        &self.principal
+        self.0.principal()
+    }
+}
+
+impl<P, A> Grant<ActionRequest<P, A>> {
+    pub fn principal(&self) -> &P {
+        self.0.principal()
     }
 
     pub fn action(&self) -> &A {
-        &self.action
+        self.0.action()
+    }
+}
+
+impl<P, A, R> Grant<ResourceRequest<P, A, R>> {
+    pub fn principal(&self) -> &P {
+        self.0.principal()
     }
 
-    pub fn resource(&self) -> &R {
-        &self.resource
+    pub fn action(&self) -> &A {
+        self.0.action()
     }
 
     pub fn into_resource(self) -> R {
-        self.resource
+        self.0.resource
     }
 }
 
@@ -222,5 +214,16 @@ mod tests {
             .unwrap_err();
 
         assert!(matches!(result, RequestError::NotApplicable));
+    }
+
+    #[test]
+    fn authorizes_custom_requests() {
+        #[derive(Debug, PartialEq, Eq)]
+        struct CustomRequest(u64);
+
+        let grant = Grant::authorize(CustomRequest(42), &Permit).unwrap();
+
+        assert_eq!(grant.request(), &CustomRequest(42));
+        assert_eq!(grant.into_request(), CustomRequest(42));
     }
 }

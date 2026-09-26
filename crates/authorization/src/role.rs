@@ -55,14 +55,14 @@ impl<P: RoleSet> Policy<PrincipalRequest<P>> for RequireRole<P::Role> {
 }
 
 impl<P: RoleSet> PrincipalRequest<P> {
-    pub fn check_role(self, role: P::Role) -> Result<Grant<P>, RequestError> {
+    pub fn check_role(self, role: P::Role) -> Result<Grant<Self>, RequestError> {
         self.authorize(&RequireRole::new(role))
     }
 
     pub fn check_all_roles(
         self,
         roles: impl IntoIterator<Item = P::Role>,
-    ) -> Result<Grant<P>, RequestError> {
+    ) -> Result<Grant<Self>, RequestError> {
         let policy = All::from_iter(roles.into_iter().map(RequireRole::new));
 
         self.authorize(&policy)
@@ -71,7 +71,7 @@ impl<P: RoleSet> PrincipalRequest<P> {
     pub fn check_any_role(
         self,
         roles: impl IntoIterator<Item = P::Role>,
-    ) -> Result<Grant<P>, RequestError> {
+    ) -> Result<Grant<Self>, RequestError> {
         let policy = Any::from_iter(roles.into_iter().map(RequireRole::new));
 
         self.authorize(&policy)
