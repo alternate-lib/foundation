@@ -46,7 +46,7 @@ impl<R> RequireRole<R> {
 
 impl<P: RoleSet> Policy<PrincipalRequest<P>> for RequireRole<P::Role> {
     fn evaluate(&self, request: &PrincipalRequest<P>) -> PolicyDecision {
-        if request.principal.has_role(&self.0) {
+        if request.principal().has_role(&self.0) {
             return PolicyDecision::Permit;
         }
 

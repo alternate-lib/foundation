@@ -26,8 +26,8 @@ where
 {
     fn evaluate(&self, request: &ActionRequest<P, A>) -> PolicyDecision {
         if request
-            .principal
-            .permits(&request.action.required_permission())
+            .principal()
+            .permits(&request.action().required_permission())
         {
             return PolicyDecision::Permit;
         }
@@ -43,8 +43,8 @@ where
 {
     fn evaluate(&self, request: &ResourceRequest<P, A, R>) -> PolicyDecision {
         if request
-            .principal
-            .permits(&request.action.required_permission())
+            .principal()
+            .permits(&request.action().required_permission())
         {
             return PolicyDecision::Permit;
         }
@@ -62,10 +62,10 @@ where
     A: Action,
 {
     fn evaluate(&self, request: &ActionRequest<P, A>) -> PolicyDecision {
-        if request.principal.roles().any(|assigned| {
+        if request.principal().roles().any(|assigned| {
             assigned
                 .implied_roles()
-                .any(|role| role.grants(&request.action.required_permission()))
+                .any(|role| role.grants(&request.action().required_permission()))
         }) {
             return PolicyDecision::Permit;
         }
@@ -81,10 +81,10 @@ where
     A: Action,
 {
     fn evaluate(&self, request: &ResourceRequest<P, A, R>) -> PolicyDecision {
-        if request.principal.roles().any(|assigned| {
+        if request.principal().roles().any(|assigned| {
             assigned
                 .implied_roles()
-                .any(|role| role.grants(&request.action.required_permission()))
+                .any(|role| role.grants(&request.action().required_permission()))
         }) {
             return PolicyDecision::Permit;
         }

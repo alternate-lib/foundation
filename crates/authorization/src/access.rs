@@ -9,7 +9,7 @@ impl AccessRequest {
 }
 
 pub struct PrincipalRequest<P> {
-    pub(crate) principal: P,
+    principal: P,
 }
 
 impl<P> PrincipalRequest<P> {
@@ -50,11 +50,15 @@ impl<Pr> PrincipalRequest<Pr> {
             PolicyDecision::NotApplicable => Err(RequestError::NotApplicable),
         }
     }
+
+    pub fn principal(&self) -> &Pr {
+        &self.principal
+    }
 }
 
 pub struct ActionRequest<P, A> {
-    pub(crate) principal: P,
-    pub(crate) action: A,
+    principal: P,
+    action: A,
 }
 
 impl<P, A> ActionRequest<P, A> {
@@ -89,12 +93,20 @@ impl<Pr, A> ActionRequest<Pr, A> {
             PolicyDecision::NotApplicable => Err(RequestError::NotApplicable),
         }
     }
+
+    pub fn principal(&self) -> &Pr {
+        &self.principal
+    }
+
+    pub fn action(&self) -> &A {
+        &self.action
+    }
 }
 
 pub struct ResourceRequest<P, A, R> {
-    pub(crate) principal: P,
-    pub(crate) action: A,
-    pub(crate) resource: R,
+    principal: P,
+    action: A,
+    resource: R,
 }
 
 impl<Pr, A, R> ResourceRequest<Pr, A, R> {
@@ -122,6 +134,18 @@ impl<Pr, A, R> ResourceRequest<Pr, A, R> {
             PolicyDecision::NotApplicable => Err(RequestError::NotApplicable),
         }
     }
+
+    pub fn principal(&self) -> &Pr {
+        &self.principal
+    }
+
+    pub fn action(&self) -> &A {
+        &self.action
+    }
+
+    pub fn resource(&self) -> &R {
+        &self.resource
+    }
 }
 
 #[derive(Debug)]
@@ -138,6 +162,10 @@ impl<P, A, R> Grant<P, A, R> {
 
     pub fn action(&self) -> &A {
         &self.action
+    }
+
+    pub fn resource(&self) -> &R {
+        &self.resource
     }
 
     pub fn into_resource(self) -> R {

@@ -29,7 +29,7 @@ where
     P: Relates<R, Kind>,
 {
     fn evaluate(&self, request: &ResourceRequest<P, A, R>) -> PolicyDecision {
-        if request.principal.relates(&request.resource) {
+        if request.principal().relates(request.resource()) {
             PolicyDecision::Permit
         } else {
             PolicyDecision::Deny
