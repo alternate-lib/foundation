@@ -95,8 +95,8 @@ impl CredentialContext {
         }
     }
 
-    pub fn kind(&self) -> CredentialKind {
-        self.kind
+    pub fn kind(&self) -> &CredentialKind {
+        &self.kind
     }
 
     pub fn credential_id(&self) -> Option<&CredentialId> {

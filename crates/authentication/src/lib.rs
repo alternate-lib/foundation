@@ -1,4 +1,4 @@
-pub use credential::{Credential, CredentialKind, SecretCredential};
+pub use credential::{CredentialKind, SecretCredential};
 pub use evidence::VerifiedCredential;
 pub use identity::{
     AuthenticatedIdentity, CredentialContext, CredentialId, CredentialRestrictions,

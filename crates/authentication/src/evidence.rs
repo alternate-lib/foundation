@@ -42,7 +42,7 @@ mod tests {
                 SubjectId::try_new("subject-123").unwrap(),
             ),
             CredentialContext::new(
-                CredentialKind::Bearer,
+                CredentialKind::try_new("access-token").unwrap(),
                 None,
                 CredentialRestrictions::unrestricted(),
             ),
