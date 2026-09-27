@@ -1,8 +1,17 @@
 [workspace]
 resolver = "3"
-members = ["crates/authentication", "crates/authorization", "crates/codec", "crates/crypto", "crates/domain", "crates/logic"]
+members = [
+  "crates/authentication",
+  "crates/authorization",
+  "crates/codec",
+  "crates/crypto",
+  "crates/domain",
+  "crates/domain-derive",
+  "crates/logic"
+]
 
 [workspace.dependencies]
+alternate-domain-derive.path = "crates/domain-derive"
 alternate-logic.path = "crates/logic"
 
 nutype = "0.8.0-beta.2"
