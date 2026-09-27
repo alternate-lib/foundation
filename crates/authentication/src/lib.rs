@@ -1,14 +1,11 @@
-pub use credential::{CredentialKind, SecretCredential};
-pub use evidence::VerifiedCredential;
-pub use identity::{
-    AuthenticatedIdentity, CredentialContext, CredentialId, CredentialRestrictions,
-    CredentialScope, Issuer, Subject, SubjectId,
+pub use authenticator::{Authenticator, AuthenticatorError};
+pub use credential::{
+    CredentialId, CredentialKind, CredentialRestrictions, CredentialScope, SecretCredential,
 };
-pub use resolver::{ContextResolver, ContextResolverError};
-pub use verifier::{CredentialVerifier, CredentialVerifierError};
+pub use identity::{Issuer, Subject, SubjectId};
+pub use verifier::CredentialVerifier;
 
+pub mod authenticator;
 pub mod credential;
-pub mod evidence;
 pub mod identity;
-pub mod resolver;
 pub mod verifier;
