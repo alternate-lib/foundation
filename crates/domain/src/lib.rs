@@ -4,6 +4,7 @@ pub use query::*;
 pub use repository::*;
 pub use transaction_scope::*;
 pub use use_case::*;
+pub use value_object::{AsView, ValueObject, validator};
 
 mod aggregate_root;
 mod entity;
