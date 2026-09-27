@@ -2,7 +2,6 @@ use std::fmt;
 
 #[nutype::nutype(
     derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref),
-    sanitize(trim),
     validate(not_empty, len_char_max = SecretCredential::MAX_LENGTH)
 )]
 pub struct SecretCredential(String);
@@ -19,7 +18,6 @@ impl fmt::Debug for SecretCredential {
 
 #[nutype::nutype(
     derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref),
-    sanitize(trim),
     validate(not_empty)
 )]
 pub struct CredentialKind(String);
@@ -35,5 +33,13 @@ mod tests {
 
         assert!(output.contains("REDACTED"));
         assert!(!output.contains("highly-secret-token"));
+    }
+
+    #[test]
+    fn preserves_secret_bytes() {
+        let credential = SecretCredential::try_new(" secret ").unwrap();
+
+        let value: &str = credential.as_ref();
+        assert_eq!(value, " secret ");
     }
 }

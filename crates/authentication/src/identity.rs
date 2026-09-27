@@ -55,7 +55,6 @@ impl Subject {
 
 #[nutype::nutype(
     derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, Display),
-    sanitize(trim),
     validate(not_empty, len_char_max = Issuer::MAX_LENGTH)
 )]
 pub struct Issuer(String);
@@ -66,7 +65,6 @@ impl Issuer {
 
 #[nutype::nutype(
     derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, Display),
-    sanitize(trim),
     validate(not_empty, len_char_max = SubjectId::MAX_LENGTH)
 )]
 pub struct SubjectId(String);
@@ -114,7 +112,6 @@ impl CredentialContext {
 
 #[nutype::nutype(
     derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, Display),
-    sanitize(trim),
     validate(not_empty, len_char_max = CredentialId::MAX_LENGTH)
 )]
 pub struct CredentialId(String);
@@ -161,7 +158,6 @@ impl Default for CredentialRestrictions {
 
 #[nutype::nutype(
     derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, Display),
-    sanitize(trim),
     validate(not_empty, len_char_max = CredentialScope::MAX_LENGTH)
 )]
 pub struct CredentialScope(String);
@@ -194,5 +190,23 @@ mod tests {
 
         assert!(restrictions.allows(&allowed));
         assert!(!restrictions.allows(&denied));
+    }
+
+    #[test]
+    fn preserves_identifier_whitespace() {
+        let issuer = Issuer::try_new(" issuer ").unwrap();
+        let subject_id = SubjectId::try_new(" subject ").unwrap();
+        let credential_id = CredentialId::try_new(" credential ").unwrap();
+        let scope = CredentialScope::try_new(" scope ").unwrap();
+
+        let issuer: &str = issuer.as_ref();
+        let subject_id: &str = subject_id.as_ref();
+        let credential_id: &str = credential_id.as_ref();
+        let scope: &str = scope.as_ref();
+
+        assert_eq!(issuer, " issuer ");
+        assert_eq!(subject_id, " subject ");
+        assert_eq!(credential_id, " credential ");
+        assert_eq!(scope, " scope ");
     }
 }
