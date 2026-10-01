@@ -1,7 +1,7 @@
 extern crate self as alternate_domain;
 
 pub use aggregate_root::*;
-pub use alternate_domain_derive::ValueObject;
+pub use alternate_domain_derive::{Entity, ValueObject};
 pub use entity::*;
 pub use query::*;
 pub use repository::*;

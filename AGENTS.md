@@ -11,6 +11,7 @@ crates/
 ├── authorization/  – authorization abstraction (policy evaluation, access requests, roles, permissions, relations)
 ├── codec/          – data serialization abstraction (binary, JSON, MessagePack)
 ├── crypto/         – crypto utilities (csprng, digest, encoding)
-├── domain/         – DDD abstractions (entities, aggregate roots, events, repositories, use cases)
+├── domain/         – DDD abstractions (entities, value objects, aggregate roots, events, repositories, use cases)
+├── domain-derive/  – Derive macros for DDD abstractions (entities, value objects)
 └── logic/          – logic abstractions (truth tables, predicate evaluation, logic combinators)
 ```
