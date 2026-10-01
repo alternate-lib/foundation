@@ -1,5 +1,6 @@
 pub use combinator::{All, And, Any, Or};
 
+pub mod builtin;
 pub mod combinator;
 mod logic;
 

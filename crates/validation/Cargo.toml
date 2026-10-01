@@ -6,7 +6,14 @@ edition = "2024"
 [dependencies]
 alternate-logic.workspace = true
 
+email_address = { version = "0.2.9", optional = true }
 thiserror.workspace = true
+url = { version = "2.5.8", optional = true }
+
+[features]
+default = []
+email-address = ["dep:email_address"]
+url = ["dep:url"]
 
 [lints]
 workspace = true
