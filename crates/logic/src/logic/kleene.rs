@@ -47,8 +47,8 @@ impl<V: KleeneMapping> Conjunction for StrongKleene<V> {
         V::from_kleene(KleeneValue::True)
     }
 
-    fn short_circuit(left: &V) -> Option<V> {
-        (left.to_kleene() == KleeneValue::False).then(|| V::from_kleene(KleeneValue::False))
+    fn should_short_circuit(left: &V) -> bool {
+        left.to_kleene() == KleeneValue::False
     }
 }
 
@@ -67,8 +67,8 @@ impl<V: KleeneMapping> Disjunction for StrongKleene<V> {
         V::from_kleene(KleeneValue::False)
     }
 
-    fn short_circuit(left: &V) -> Option<V> {
-        (left.to_kleene() == KleeneValue::True).then(|| V::from_kleene(KleeneValue::True))
+    fn should_short_circuit(left: &V) -> bool {
+        left.to_kleene() == KleeneValue::True
     }
 }
 
@@ -128,18 +128,15 @@ mod tests {
 
     #[test]
     fn short_circuits_conjunction_on_false() {
-        assert_eq!(
-            <StrongKleene as Conjunction>::short_circuit(&KleeneValue::True),
-            None
-        );
-        assert_eq!(
-            <StrongKleene as Conjunction>::short_circuit(&KleeneValue::False),
-            Some(KleeneValue::False)
-        );
-        assert_eq!(
-            <StrongKleene as Conjunction>::short_circuit(&KleeneValue::Unknown),
-            None
-        );
+        assert!(!<StrongKleene as Conjunction>::should_short_circuit(
+            &KleeneValue::True
+        ));
+        assert!(<StrongKleene as Conjunction>::should_short_circuit(
+            &KleeneValue::False
+        ));
+        assert!(!<StrongKleene as Conjunction>::should_short_circuit(
+            &KleeneValue::Unknown
+        ));
     }
 
     #[test]
@@ -184,18 +181,15 @@ mod tests {
 
     #[test]
     fn short_circuits_disjunction_on_true() {
-        assert_eq!(
-            <StrongKleene as Disjunction>::short_circuit(&KleeneValue::True),
-            Some(KleeneValue::True)
-        );
-        assert_eq!(
-            <StrongKleene as Disjunction>::short_circuit(&KleeneValue::False),
-            None
-        );
-        assert_eq!(
-            <StrongKleene as Disjunction>::short_circuit(&KleeneValue::Unknown),
-            None
-        );
+        assert!(<StrongKleene as Disjunction>::should_short_circuit(
+            &KleeneValue::True
+        ));
+        assert!(!<StrongKleene as Disjunction>::should_short_circuit(
+            &KleeneValue::False
+        ));
+        assert!(!<StrongKleene as Disjunction>::should_short_circuit(
+            &KleeneValue::Unknown
+        ));
     }
 
     #[test]

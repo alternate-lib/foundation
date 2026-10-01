@@ -15,8 +15,8 @@ pub trait Conjunction: Logic {
 
     fn identity() -> Self::Value;
 
-    fn short_circuit(_left: &Self::Value) -> Option<Self::Value> {
-        None
+    fn should_short_circuit(_left: &Self::Value) -> bool {
+        false
     }
 }
 
@@ -25,8 +25,8 @@ pub trait Disjunction: Logic {
 
     fn identity() -> Self::Value;
 
-    fn short_circuit(_left: &Self::Value) -> Option<Self::Value> {
-        None
+    fn should_short_circuit(_left: &Self::Value) -> bool {
+        false
     }
 }
 

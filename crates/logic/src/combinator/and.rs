@@ -19,8 +19,8 @@ where
     fn evaluate(&self, context: &C) -> Lo::Value {
         let left = self.0.evaluate(context);
 
-        if let Some(result) = Lo::short_circuit(&left) {
-            return result;
+        if Lo::should_short_circuit(&left) {
+            return left;
         }
 
         Lo::and(left, self.1.evaluate(context))

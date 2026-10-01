@@ -36,11 +36,8 @@ impl Conjunction for PolicyLogic {
         PolicyDecision::NotApplicable
     }
 
-    fn short_circuit(left: &PolicyDecision) -> Option<PolicyDecision> {
-        match left {
-            PolicyDecision::Deny => Some(PolicyDecision::Deny),
-            _ => None,
-        }
+    fn should_short_circuit(left: &PolicyDecision) -> bool {
+        matches!(left, PolicyDecision::Deny)
     }
 }
 
@@ -57,11 +54,8 @@ impl Disjunction for PolicyLogic {
         PolicyDecision::NotApplicable
     }
 
-    fn short_circuit(left: &PolicyDecision) -> Option<PolicyDecision> {
-        match left {
-            PolicyDecision::Permit => Some(PolicyDecision::Permit),
-            _ => None,
-        }
+    fn should_short_circuit(left: &PolicyDecision) -> bool {
+        matches!(left, PolicyDecision::Permit)
     }
 }
 

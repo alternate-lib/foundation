@@ -37,8 +37,8 @@ where
         let mut value = L::identity();
 
         for predicate in &self.0 {
-            if let Some(result) = L::short_circuit(&value) {
-                return result;
+            if L::should_short_circuit(&value) {
+                return value;
             }
 
             value = L::and(value, predicate.evaluate(context));

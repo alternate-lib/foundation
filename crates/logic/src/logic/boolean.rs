@@ -16,8 +16,8 @@ impl Conjunction for Boolean {
         true
     }
 
-    fn short_circuit(left: &bool) -> Option<bool> {
-        (!*left).then_some(false)
+    fn should_short_circuit(left: &bool) -> bool {
+        !*left
     }
 }
 
@@ -30,8 +30,8 @@ impl Disjunction for Boolean {
         false
     }
 
-    fn short_circuit(left: &bool) -> Option<bool> {
-        (*left).then_some(true)
+    fn should_short_circuit(left: &bool) -> bool {
+        *left
     }
 }
 
@@ -55,8 +55,8 @@ mod tests {
 
     #[test]
     fn short_circuits_conjunction_on_false() {
-        assert_eq!(<Boolean as Conjunction>::short_circuit(&true), None);
-        assert_eq!(<Boolean as Conjunction>::short_circuit(&false), Some(false));
+        assert!(!<Boolean as Conjunction>::should_short_circuit(&true));
+        assert!(<Boolean as Conjunction>::should_short_circuit(&false));
     }
 
     #[test]
@@ -69,8 +69,8 @@ mod tests {
 
     #[test]
     fn short_circuits_disjunction_on_true() {
-        assert_eq!(<Boolean as Disjunction>::short_circuit(&true), Some(true));
-        assert_eq!(<Boolean as Disjunction>::short_circuit(&false), None);
+        assert!(<Boolean as Disjunction>::should_short_circuit(&true));
+        assert!(!<Boolean as Disjunction>::should_short_circuit(&false));
     }
 
     #[test]
