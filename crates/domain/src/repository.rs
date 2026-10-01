@@ -6,19 +6,19 @@ pub trait Repository<AR: AggregateRoot + Sync>: Sync
 where
     AR::Id: Send,
 {
-    type Error: std::error::Error;
+    type BackendErr: std::error::Error;
 
-    fn find_by_ids(
+    fn batch_load(
         &self,
         ids: &[AR::Id],
-    ) -> impl Future<Output = Result<Vec<AR>, RepositoryError<Self::Error>>> + Send;
+    ) -> impl Future<Output = Result<Vec<AR>, RepositoryError<Self::BackendErr>>> + Send;
 
-    fn find_by_id(
+    fn load(
         &self,
         id: AR::Id,
-    ) -> impl Future<Output = Result<Option<AR>, RepositoryError<Self::Error>>> + Send {
+    ) -> impl Future<Output = Result<Option<AR>, RepositoryError<Self::BackendErr>>> + Send {
         async move {
-            self.find_by_ids(&[id])
+            self.batch_load(&[id])
                 .await
                 .map(|mut entities| entities.pop())
         }
@@ -27,30 +27,18 @@ where
     fn batch_save(
         &self,
         entities: &[AR],
-    ) -> impl Future<Output = Result<(), RepositoryError<Self::Error>>> + Send;
+    ) -> impl Future<Output = Result<(), RepositoryError<Self::BackendErr>>> + Send;
 
     fn save(
         &self,
         entity: &AR,
-    ) -> impl Future<Output = Result<(), RepositoryError<Self::Error>>> + Send {
+    ) -> impl Future<Output = Result<(), RepositoryError<Self::BackendErr>>> + Send {
         async move { self.batch_save(slice::from_ref(entity)).await }
-    }
-
-    fn delete_by_ids(
-        &self,
-        ids: &[AR::Id],
-    ) -> impl Future<Output = Result<(), RepositoryError<Self::Error>>> + Send;
-
-    fn delete_by_id(
-        &self,
-        id: AR::Id,
-    ) -> impl Future<Output = Result<(), RepositoryError<Self::Error>>> + Send {
-        async move { self.delete_by_ids(&[id]).await }
     }
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum RepositoryError<InnerErr: std::error::Error> {
+pub enum RepositoryError<E: std::error::Error> {
     #[error("entity not found")]
     NotFound,
 
@@ -61,5 +49,5 @@ pub enum RepositoryError<InnerErr: std::error::Error> {
     StaleVersion,
 
     #[error(transparent)]
-    Inner(#[from] InnerErr),
+    Backend(#[from] E),
 }

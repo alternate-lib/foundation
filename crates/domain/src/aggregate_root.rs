@@ -3,13 +3,15 @@ use std::ops::Deref;
 use crate::Entity;
 
 pub trait AggregateRoot: Entity {
-    type Ev: Event;
+    type Event: Event;
 
     const TYPE: &'static str;
 
     fn version(&self) -> Version;
 
-    fn drain_events(&mut self) -> Vec<Self::Ev>;
+    fn drain_events(&mut self) -> Vec<Self::Event>;
+
+    fn is_deleted(&self) -> bool;
 }
 
 pub trait Event {
@@ -41,7 +43,7 @@ impl Version {
         }
     }
 
-    pub fn dirty(&self) -> bool {
+    pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 
@@ -61,7 +63,7 @@ impl Deref for Version {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct EventList<E: Event>(Vec<E>);
 
 impl<E: Event> Default for EventList<E> {
