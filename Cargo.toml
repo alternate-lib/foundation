@@ -7,12 +7,14 @@ members = [
   "crates/crypto",
   "crates/domain",
   "crates/domain-derive",
-  "crates/logic"
+  "crates/logic",
+  "crates/validation"
 ]
 
 [workspace.dependencies]
 alternate-domain-derive.path = "crates/domain-derive"
 alternate-logic.path = "crates/logic"
+alternate-validation.path = "crates/validation"
 
 nutype = "0.8.0-beta.2"
 serde = { version = "1.0.229", features = ["derive"] }
