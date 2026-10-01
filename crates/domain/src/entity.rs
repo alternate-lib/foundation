@@ -1,43 +1,49 @@
-use std::hash::Hash;
+use std::{error::Error, fmt, hash::Hash};
 
-pub trait Entity: Eq + Hash {
-    type Id: Eq + Hash;
+pub trait Entity: Sized {
+    type Id: Copy + Eq + Hash;
     type Snapshot;
 
     fn id(&self) -> Self::Id;
 
     fn snapshot(&self) -> Self::Snapshot;
 
-    fn restore(snapshot: Self::Snapshot) -> Self;
+    fn restore(snapshot: Self::Snapshot) -> Result<Self, EntityRestoreError>;
 }
 
-#[macro_export]
-macro_rules! impl_entity {
-    ($type:ty, $snapshot:ty) => {
-        impl PartialEq for $type {
-            fn eq(&self, other: &Self) -> bool {
-                $crate::Entity::id(self) == $crate::Entity::id(other)
-            }
-        }
+#[derive(Debug)]
+pub struct EntityRestoreError {
+    entity: &'static str,
+    field: &'static str,
+    source: Box<dyn Error + 'static>,
+}
 
-        impl Eq for $type {}
-
-        impl std::hash::Hash for $type {
-            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-                $crate::Entity::id(self).hash(state);
-            }
+impl EntityRestoreError {
+    pub fn new(entity: &'static str, field: &'static str, source: impl Error + 'static) -> Self {
+        Self {
+            entity,
+            field,
+            source: Box::new(source),
         }
+    }
 
-        impl From<$snapshot> for $type {
-            fn from(value: $snapshot) -> Self {
-                $crate::Entity::restore(value)
-            }
-        }
+    pub fn entity(&self) -> &'static str {
+        self.entity
+    }
 
-        impl From<&$type> for $snapshot {
-            fn from(value: &$type) -> Self {
-                $crate::Entity::snapshot(value)
-            }
-        }
-    };
+    pub fn field(&self) -> &'static str {
+        self.field
+    }
+}
+
+impl fmt::Display for EntityRestoreError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "failed to restore {}.{}", self.entity, self.field)
+    }
+}
+
+impl Error for EntityRestoreError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(self.source.as_ref())
+    }
 }
