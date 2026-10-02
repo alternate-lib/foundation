@@ -8,7 +8,6 @@ pub fn expand(model: &Model) -> TokenStream {
         ident,
         raw,
         runtime,
-        error,
         ..
     } = model;
 
@@ -21,15 +20,19 @@ pub fn expand(model: &Model) -> TokenStream {
         });
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
     let view_type = quote! { <#raw as #runtime::AsView>::View };
-    let value_ident = model.helper_ident("value");
+    let raw_ident = model.helper_ident("raw");
 
-    let validate = if let Some(path) = &model.validator {
-        quote! { (#path)(#value_ident)?; ::std::result::Result::Ok(()) }
-    } else {
-        quote! { ::std::result::Result::Ok(()) }
-    };
+    let mut vo_generics = generics.clone();
+    vo_generics
+        .make_where_clause()
+        .predicates
+        .push(syn::parse_quote! {
+            #ident #type_generics: ::std::cmp::PartialEq
+        });
 
-    let (constructor, conversion) = construction(model, &generics);
+    let (error, validate) = validation(model, &view_type, &mut vo_generics);
+    let (vo_impl_generics, _, vo_where_clause) = vo_generics.split_for_impl();
+    let (constructor, conversion) = construction(model, &vo_generics);
 
     let deref = model.deref.then(|| {
         quote! {
@@ -52,12 +55,13 @@ pub fn expand(model: &Model) -> TokenStream {
             }
         }
 
-        impl #impl_generics #runtime::ValueObject for #ident #type_generics #where_clause {
+        impl #vo_impl_generics #runtime::ValueObject for #ident #type_generics #vo_where_clause {
             type Raw = #raw;
             type Error = #error;
 
-            fn validate(#value_ident: &Self::View) -> ::std::result::Result<(), Self::Error> {
+            fn try_new(#raw_ident: Self::Raw) -> ::std::result::Result<Self, Self::Error> {
                 #validate
+                ::std::result::Result::Ok(Self(#raw_ident))
             }
 
             fn into_raw(self) -> Self::Raw {
@@ -65,12 +69,8 @@ pub fn expand(model: &Model) -> TokenStream {
             }
         }
 
-        impl #impl_generics #ident #type_generics #where_clause {
+        impl #vo_impl_generics #ident #type_generics #vo_where_clause {
             #constructor
-
-            pub fn validate(#value_ident: &#view_type) -> ::std::result::Result<(), #error> {
-                <Self as #runtime::ValueObject>::validate(#value_ident)
-            }
 
             pub fn as_view(&self) -> &#view_type {
                 <Self as #runtime::AsView>::as_view(self)
@@ -92,33 +92,79 @@ pub fn expand(model: &Model) -> TokenStream {
     }
 }
 
+fn validation(
+    model: &Model,
+    view_type: &TokenStream,
+    generics: &mut syn::Generics,
+) -> (TokenStream, TokenStream) {
+    let Some(validator) = &model.validator else {
+        return (quote! { ::std::convert::Infallible }, TokenStream::new());
+    };
+    let raw = &model.raw;
+    let runtime = &model.runtime;
+    let raw_ident = model.helper_ident("raw");
+    let validator_ident = model.helper_ident("validator");
+
+    generics
+        .make_where_clause()
+        .predicates
+        .push(syn::parse_quote! {
+            #validator: #runtime::__private::Validator<#view_type>
+        });
+
+    let construction = if let Some(construction) = &model.validator_with {
+        quote! { #construction }
+    } else {
+        generics
+            .make_where_clause()
+            .predicates
+            .push(syn::parse_quote! {
+                #validator: ::std::default::Default
+            });
+        quote! { <#validator as ::std::default::Default>::default() }
+    };
+
+    (
+        quote! {
+            #runtime::__private::ValidationErrors<
+                <#validator as #runtime::__private::Validator<#view_type>>::Error
+            >
+        },
+        quote! {
+            let #validator_ident: #validator = #construction;
+            <#validator as #runtime::__private::Validator<#view_type>>::validate(
+                &#validator_ident,
+                <#raw as #runtime::AsView>::as_view(&#raw_ident),
+            )?;
+        },
+    )
+}
+
 fn construction(model: &Model, generics: &syn::Generics) -> (TokenStream, TokenStream) {
     let Model {
         ident,
         raw,
         runtime,
-        error,
         ..
     } = model;
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
     let raw_ident = model.helper_ident("raw");
+    let error_ident = model.helper_ident("error");
+    let value_ident = model.helper_ident("value");
+
     if model.validator.is_some() {
         (
             quote! {
-                pub fn try_new(#raw_ident: impl ::std::convert::Into<#raw>) -> ::std::result::Result<Self, #error> {
-                    let #raw_ident: #raw = ::std::convert::Into::into(#raw_ident);
-                    <Self as #runtime::ValueObject>::validate(
-                        <#raw as #runtime::AsView>::as_view(&#raw_ident),
-                    )?;
-                    ::std::result::Result::Ok(Self(#raw_ident))
+                pub fn try_new(#raw_ident: impl ::std::convert::Into<#raw>) -> ::std::result::Result<Self, <Self as #runtime::ValueObject>::Error> {
+                    <Self as #runtime::ValueObject>::try_new(::std::convert::Into::into(#raw_ident))
                 }
             },
             quote! {
                 impl #impl_generics ::std::convert::TryFrom<#raw> for #ident #type_generics #where_clause {
-                    type Error = #error;
+                    type Error = <Self as #runtime::ValueObject>::Error;
 
                     fn try_from(#raw_ident: #raw) -> ::std::result::Result<Self, Self::Error> {
-                        Self::try_new(#raw_ident)
+                        <Self as #runtime::ValueObject>::try_new(#raw_ident)
                     }
                 }
             },
@@ -127,7 +173,10 @@ fn construction(model: &Model, generics: &syn::Generics) -> (TokenStream, TokenS
         (
             quote! {
                 pub fn new(#raw_ident: impl ::std::convert::Into<#raw>) -> Self {
-                    Self(::std::convert::Into::into(#raw_ident))
+                    match <Self as #runtime::ValueObject>::try_new(::std::convert::Into::into(#raw_ident)) {
+                        ::std::result::Result::Ok(#value_ident) => #value_ident,
+                        ::std::result::Result::Err(#error_ident) => match #error_ident {},
+                    }
                 }
             },
             quote! {
@@ -180,7 +229,7 @@ mod tests {
             quote! { custom::Storage },
         ] {
             for validated in [false, true] {
-                let validation = validated.then(|| quote! { validate = check, error = Error, });
+                let validation = validated.then(|| quote! { validator = Check, });
                 let (methods, traits) = generated_api(quote! {
                     #[value_object(#validation)]
                     struct Wrapper(#raw);
@@ -192,7 +241,7 @@ mod tests {
                 assert_eq!(traits.iter().any(|name| name == "TryFrom"), validated);
                 assert!(traits.iter().any(|name| name == "AsView"));
                 assert!(!traits.iter().any(|name| name == "FromStr"));
-                for method in ["as_str", "as_slice", "get"] {
+                for method in ["validate", "as_str", "as_slice", "get"] {
                     assert!(!methods.iter().any(|name| name == method));
                 }
             }

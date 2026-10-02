@@ -47,6 +47,7 @@ name = "alternate-domain"
 version = "0.1.0"
 dependencies = [
  "alternate-domain-derive",
+ "alternate-validation",
  "jiff",
  "thiserror",
  "uuid",

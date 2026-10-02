@@ -145,7 +145,7 @@ fn restore_field(field: &Field, model: &Model, snapshot: &Ident) -> TokenStream 
 
     let conversion = match field.category {
         Category::ValueObject => quote! {
-            <#leaf as ::std::convert::TryFrom<<#leaf as #runtime::ValueObject>::Raw>>::try_from(#value)
+            <#leaf as #runtime::ValueObject>::try_new(#value)
         },
         Category::Relation => quote! { <#leaf as #runtime::Entity>::restore(#value) },
         _ => return quote! { #snapshot.#name },

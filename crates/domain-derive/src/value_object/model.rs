@@ -1,6 +1,6 @@
 use proc_macro2::Span;
 use syn::{
-    Data, DeriveInput, Fields, GenericParam, Generics, Ident, Path, Type, Visibility,
+    Data, DeriveInput, Expr, Fields, GenericParam, Generics, Ident, Path, Type, Visibility,
     spanned::Spanned,
 };
 
@@ -12,8 +12,8 @@ pub struct Model {
     pub generics: Generics,
     pub raw: Type,
     pub runtime: Path,
-    pub validator: Option<Path>,
-    pub error: Type,
+    pub validator: Option<Type>,
+    pub validator_with: Option<Expr>,
     pub deref: bool,
 }
 
@@ -68,22 +68,14 @@ impl Model {
             }
         }
 
-        let error = match (&options.validate, options.error) {
-            (Some(_), Some(error)) => error,
-            (Some(path), None) => {
-                return Err(syn::Error::new(
-                    path.span(),
-                    "custom validation requires `error = ErrorType`",
-                ));
-            }
-            (None, Some(error)) => {
-                return Err(syn::Error::new(
-                    error.span(),
-                    "`error` requires validation configuration",
-                ));
-            }
-            (None, None) => syn::parse_quote!(::std::convert::Infallible),
-        };
+        if options.validator.is_none()
+            && let Some(construction) = &options.validator_with
+        {
+            return Err(syn::Error::new(
+                construction.span(),
+                "`validator_with` requires `validator = ValidatorType`",
+            ));
+        }
 
         if is_bare_type_parameter(&field.ty, &input.generics) {
             return Err(syn::Error::new(
@@ -98,8 +90,8 @@ impl Model {
             generics: input.generics,
             raw: field.ty,
             runtime,
-            validator: options.validate,
-            error,
+            validator: options.validator,
+            validator_with: options.validator_with,
             deref: options.deref.is_present(),
         })
     }
@@ -181,17 +173,21 @@ mod tests {
     }
 
     #[test]
-    fn validates_error_policy_and_coherence() {
+    fn validates_construction_policy_and_coherence() {
         for tokens in [
-            quote! { #[value_object(validate = check)] struct Bad(String); },
-            quote! { #[value_object(error = Error)] struct Bad(String); },
-            quote! {
-                #[value_object(validate = check, error = Error)]
-                struct Bad<T>(T);
-            },
+            quote! { #[value_object(validator_with = Check::new())] struct Bad(String); },
+            quote! { #[value_object(validator = Check)] struct Bad<T>(T); },
         ] {
             assert!(parse(tokens).is_err());
         }
+
+        assert!(
+            parse(quote! {
+                #[value_object(validator = Check)]
+                struct Wrapper(String);
+            })
+            .is_ok()
+        );
     }
 
     #[test]

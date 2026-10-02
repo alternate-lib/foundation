@@ -1,5 +1,5 @@
-use crate::validator::{self, string::UrlError};
+use alternate_validation::builtin;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, alternate_domain::ValueObject)]
-#[value_object(validate = validator::string::url, error = UrlError)]
+#[value_object(validator = builtin::Url)]
 pub struct Url(String);

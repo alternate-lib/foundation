@@ -7,7 +7,12 @@ pub use query::*;
 pub use repository::*;
 pub use transaction_scope::*;
 pub use use_case::*;
-pub use value_object::{AsView, ValueObject, validator};
+pub use value_object::{AsView, ValueObject};
+
+#[doc(hidden)]
+pub mod __private {
+    pub use alternate_validation::{ValidationErrors, Validator};
+}
 
 mod aggregate_root;
 mod entity;
