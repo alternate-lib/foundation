@@ -1,5 +1,6 @@
 use crate::{ValidationErrors, Validator};
 
+#[derive(Debug, Clone, Copy, Default)]
 pub struct NonEmpty;
 
 impl Validator<str> for NonEmpty {

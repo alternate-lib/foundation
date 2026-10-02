@@ -1,5 +1,6 @@
 use crate::{ValidationErrors, Validator};
 
+#[derive(Debug, Clone, Copy, Default)]
 pub struct MinLength<const L: usize>;
 
 impl<const L: usize> Validator<str> for MinLength<L> {

@@ -1,5 +1,6 @@
 use crate::{ValidationErrors, Validator};
 
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Url;
 
 impl Validator<str> for Url {
