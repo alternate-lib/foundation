@@ -2,12 +2,12 @@ use std::marker::PhantomData;
 
 use alternate_logic::{Conjunction, Disjunction, Logic, Predicate};
 
-use crate::Validator;
+use crate::{ValidationErrors, Validator};
 
 pub(crate) struct ValidationLogic<E>(PhantomData<fn() -> E>);
 
 impl<E> Logic for ValidationLogic<E> {
-    type Value = Result<(), Vec<E>>;
+    type Value = Result<(), ValidationErrors<E>>;
 }
 
 impl<E> Conjunction for ValidationLogic<E> {
@@ -28,7 +28,7 @@ impl<E> Conjunction for ValidationLogic<E> {
 
 impl<E> Disjunction for ValidationLogic<E> {
     fn identity() -> Self::Value {
-        Err(Vec::new())
+        Err(ValidationErrors::default())
     }
 
     fn or(left: Self::Value, right: Self::Value) -> Self::Value {
@@ -58,7 +58,10 @@ where
 {
     type Logic = ValidationLogic<V::Error>;
 
-    fn evaluate(&self, context: &ValidationContext<'_, T>) -> Result<(), Vec<V::Error>> {
+    fn evaluate(
+        &self,
+        context: &ValidationContext<'_, T>,
+    ) -> Result<(), ValidationErrors<V::Error>> {
         self.0.validate(context.value)
     }
 }

@@ -1,12 +1,15 @@
-use crate::Validator;
+use crate::{ValidationErrors, Validator};
 
 pub struct Url;
 
 impl Validator<str> for Url {
     type Error = UrlError;
 
-    fn validate(&self, value: &str) -> Result<(), Vec<Self::Error>> {
-        let _: url::Url = value.parse().map_err(UrlError::from).map_err(|e| vec![e])?;
+    fn validate(&self, value: &str) -> Result<(), ValidationErrors<Self::Error>> {
+        let _: url::Url = value
+            .parse()
+            .map_err(UrlError::from)
+            .map_err(ValidationErrors::single)?;
 
         Ok(())
     }
@@ -73,7 +76,11 @@ mod tests {
             ("http://[invalid]", UrlError::Invalid("ipv6 address")),
             ("http://exa mple.com", UrlError::Invalid("domain")),
         ] {
-            assert_eq!(Url.validate(value), Err(vec![error]), "{value:?}");
+            assert_eq!(
+                Url.validate(value),
+                Err(ValidationErrors::single(error)),
+                "{value:?}"
+            );
         }
     }
 }

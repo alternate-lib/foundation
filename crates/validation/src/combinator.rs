@@ -4,7 +4,7 @@ use alternate_logic::{
 };
 
 use crate::{
-    Validator,
+    ValidationErrors, Validator,
     logic::{ValidationContext, ValidatorPredicate},
 };
 
@@ -26,7 +26,7 @@ where
 {
     type Error = L::Error;
 
-    fn validate(&self, value: &T) -> Result<(), Vec<Self::Error>> {
+    fn validate(&self, value: &T) -> Result<(), ValidationErrors<Self::Error>> {
         self.0.evaluate(&ValidationContext { value })
     }
 }
@@ -49,7 +49,7 @@ where
 {
     type Error = L::Error;
 
-    fn validate(&self, value: &T) -> Result<(), Vec<Self::Error>> {
+    fn validate(&self, value: &T) -> Result<(), ValidationErrors<Self::Error>> {
         self.0.evaluate(&ValidationContext { value })
     }
 }
@@ -83,7 +83,7 @@ impl<V> FromIterator<V> for All<V> {
 impl<T: ?Sized, V: Validator<T>> Validator<T> for All<V> {
     type Error = V::Error;
 
-    fn validate(&self, value: &T) -> Result<(), Vec<Self::Error>> {
+    fn validate(&self, value: &T) -> Result<(), ValidationErrors<Self::Error>> {
         self.0.evaluate(&ValidationContext { value })
     }
 }
@@ -117,7 +117,7 @@ impl<V> FromIterator<V> for Any<V> {
 impl<T: ?Sized, V: Validator<T>> Validator<T> for Any<V> {
     type Error = V::Error;
 
-    fn validate(&self, value: &T) -> Result<(), Vec<Self::Error>> {
+    fn validate(&self, value: &T) -> Result<(), ValidationErrors<Self::Error>> {
         self.0.evaluate(&ValidationContext { value })
     }
 }
@@ -146,7 +146,7 @@ macro_rules! any {
 mod tests {
     use std::cell::RefCell;
 
-    use crate::{FnValidator, Validator, builtin::MinLength};
+    use crate::{FnValidator, ValidationErrors, Validator, builtin::MinLength};
 
     #[derive(Debug, PartialEq, Eq, thiserror::Error)]
     #[error("{0}")]
@@ -203,7 +203,7 @@ mod tests {
                     let expected = if errors.is_empty() {
                         Ok(())
                     } else {
-                        Err(errors)
+                        Err(ValidationErrors::new(errors))
                     };
 
                     assert_eq!(validator.validate(&()), expected);
@@ -227,11 +227,11 @@ mod tests {
                     let expected = if first || second || third {
                         Ok(())
                     } else {
-                        Err(vec![
+                        Err(ValidationErrors::new(vec![
                             TestError("first"),
                             TestError("second"),
                             TestError("third"),
-                        ])
+                        ]))
                     };
                     let calls = if first {
                         1

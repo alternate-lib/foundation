@@ -1,14 +1,17 @@
-use crate::Validator;
+use crate::{ValidationErrors, Validator};
 
 pub struct MaxLength<const L: usize>;
 
 impl<const L: usize> Validator<str> for MaxLength<L> {
     type Error = MaxLengthError;
 
-    fn validate(&self, value: &str) -> Result<(), Vec<Self::Error>> {
+    fn validate(&self, value: &str) -> Result<(), ValidationErrors<Self::Error>> {
         let actual = value.chars().count();
         if actual > L {
-            return Err(vec![MaxLengthError { maximum: L, actual }]);
+            return Err(ValidationErrors::single(MaxLengthError {
+                maximum: L,
+                actual,
+            }));
         }
 
         Ok(())
@@ -18,10 +21,13 @@ impl<const L: usize> Validator<str> for MaxLength<L> {
 impl<V, const L: usize> Validator<[V]> for MaxLength<L> {
     type Error = MaxLengthError;
 
-    fn validate(&self, value: &[V]) -> Result<(), Vec<Self::Error>> {
+    fn validate(&self, value: &[V]) -> Result<(), ValidationErrors<Self::Error>> {
         let actual = value.len();
         if actual > L {
-            return Err(vec![MaxLengthError { maximum: L, actual }]);
+            return Err(ValidationErrors::single(MaxLengthError {
+                maximum: L,
+                actual,
+            }));
         }
 
         Ok(())
@@ -47,10 +53,10 @@ mod tests {
         for value in ["abcd", "é中🦀ß"] {
             assert_eq!(
                 MaxLength::<3>.validate(value),
-                Err(vec![MaxLengthError {
+                Err(ValidationErrors::single(MaxLengthError {
                     maximum: 3,
                     actual: 4
-                }]),
+                })),
                 "{value:?}"
             );
         }
@@ -63,10 +69,10 @@ mod tests {
         }
         assert_eq!(
             MaxLength::<3>.validate(&[1, 2, 3, 4][..]),
-            Err(vec![MaxLengthError {
+            Err(ValidationErrors::single(MaxLengthError {
                 maximum: 3,
                 actual: 4
-            }])
+            }))
         );
         assert_eq!(MaxLength::<3>.validate(&[(); 3][..]), Ok(()));
     }
@@ -75,10 +81,10 @@ mod tests {
     fn max_length_zero() {
         assert_eq!(MaxLength::<0>.validate(""), Ok(()));
         assert_eq!(MaxLength::<0>.validate(&[] as &[u8]), Ok(()));
-        let error = Err(vec![MaxLengthError {
+        let error = Err(ValidationErrors::single(MaxLengthError {
             maximum: 0,
             actual: 1,
-        }]);
+        }));
         assert_eq!(MaxLength::<0>.validate("🦀"), error);
         assert_eq!(MaxLength::<0>.validate(&[1][..]), error);
     }

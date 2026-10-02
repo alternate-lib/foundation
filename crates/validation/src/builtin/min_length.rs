@@ -1,14 +1,17 @@
-use crate::Validator;
+use crate::{ValidationErrors, Validator};
 
 pub struct MinLength<const L: usize>;
 
 impl<const L: usize> Validator<str> for MinLength<L> {
     type Error = MinLengthError;
 
-    fn validate(&self, value: &str) -> Result<(), Vec<Self::Error>> {
+    fn validate(&self, value: &str) -> Result<(), ValidationErrors<Self::Error>> {
         let actual = value.chars().count();
         if actual < L {
-            return Err(vec![MinLengthError { minimum: L, actual }]);
+            return Err(ValidationErrors::single(MinLengthError {
+                minimum: L,
+                actual,
+            }));
         }
 
         Ok(())
@@ -18,10 +21,13 @@ impl<const L: usize> Validator<str> for MinLength<L> {
 impl<V, const L: usize> Validator<[V]> for MinLength<L> {
     type Error = MinLengthError;
 
-    fn validate(&self, value: &[V]) -> Result<(), Vec<Self::Error>> {
+    fn validate(&self, value: &[V]) -> Result<(), ValidationErrors<Self::Error>> {
         let actual = value.len();
         if actual < L {
-            return Err(vec![MinLengthError { minimum: L, actual }]);
+            return Err(ValidationErrors::single(MinLengthError {
+                minimum: L,
+                actual,
+            }));
         }
 
         Ok(())
@@ -47,7 +53,10 @@ mod tests {
         for (value, actual) in [("", 0), ("ab", 2), ("é🦀", 2)] {
             assert_eq!(
                 MinLength::<3>.validate(value),
-                Err(vec![MinLengthError { minimum: 3, actual }]),
+                Err(ValidationErrors::single(MinLengthError {
+                    minimum: 3,
+                    actual
+                })),
                 "{value:?}"
             );
         }
@@ -61,7 +70,10 @@ mod tests {
         for (value, actual) in [(&[][..], 0), (&[1, 2][..], 2)] {
             assert_eq!(
                 MinLength::<3>.validate(value),
-                Err(vec![MinLengthError { minimum: 3, actual }])
+                Err(ValidationErrors::single(MinLengthError {
+                    minimum: 3,
+                    actual
+                }))
             );
         }
         assert_eq!(MinLength::<3>.validate(&[(); 3][..]), Ok(()));

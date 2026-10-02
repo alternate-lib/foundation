@@ -1,15 +1,15 @@
-use crate::Validator;
+use crate::{ValidationErrors, Validator};
 
 pub struct EmailAddress;
 
 impl Validator<str> for EmailAddress {
     type Error = EmailAddressError;
 
-    fn validate(&self, value: &str) -> Result<(), Vec<Self::Error>> {
+    fn validate(&self, value: &str) -> Result<(), ValidationErrors<Self::Error>> {
         let _: email_address::EmailAddress = value
             .parse()
             .map_err(EmailAddressError::from)
-            .map_err(|e| vec![e])?;
+            .map_err(ValidationErrors::single)?;
 
         Ok(())
     }
@@ -79,12 +79,18 @@ mod tests {
             ("user@", EmailAddressError::Empty("domain")),
             ("user@example..com", EmailAddressError::Empty("subdomain")),
         ] {
-            assert_eq!(EmailAddress.validate(value), Err(vec![error]), "{value:?}");
+            assert_eq!(
+                EmailAddress.validate(value),
+                Err(ValidationErrors::single(error)),
+                "{value:?}"
+            );
         }
         assert!(EmailAddress.validate("").is_err());
         assert_eq!(
             EmailAddress.validate(&format!("{}@example.com", "a".repeat(65))),
-            Err(vec![EmailAddressError::TooLong("local part")])
+            Err(ValidationErrors::single(EmailAddressError::TooLong(
+                "local part"
+            )))
         );
     }
 }

@@ -1,17 +1,17 @@
-use crate::Validator;
+use crate::{ValidationErrors, Validator};
 
 pub struct ExactLength<const L: usize>;
 
 impl<const L: usize> Validator<str> for ExactLength<L> {
     type Error = ExactLengthError;
 
-    fn validate(&self, value: &str) -> Result<(), Vec<Self::Error>> {
+    fn validate(&self, value: &str) -> Result<(), ValidationErrors<Self::Error>> {
         let actual = value.chars().count();
         if actual != L {
-            return Err(vec![ExactLengthError {
+            return Err(ValidationErrors::single(ExactLengthError {
                 expected: L,
                 actual,
-            }]);
+            }));
         }
 
         Ok(())
@@ -21,13 +21,13 @@ impl<const L: usize> Validator<str> for ExactLength<L> {
 impl<V, const L: usize> Validator<[V]> for ExactLength<L> {
     type Error = ExactLengthError;
 
-    fn validate(&self, value: &[V]) -> Result<(), Vec<Self::Error>> {
+    fn validate(&self, value: &[V]) -> Result<(), ValidationErrors<Self::Error>> {
         let actual = value.len();
         if actual != L {
-            return Err(vec![ExactLengthError {
+            return Err(ValidationErrors::single(ExactLengthError {
                 expected: L,
                 actual,
-            }]);
+            }));
         }
 
         Ok(())
@@ -53,10 +53,10 @@ mod tests {
         for (value, actual) in [("", 0), ("ab", 2), ("abcd", 4), ("é🦀", 2)] {
             assert_eq!(
                 ExactLength::<3>.validate(value),
-                Err(vec![ExactLengthError {
+                Err(ValidationErrors::single(ExactLengthError {
                     expected: 3,
                     actual
-                }]),
+                })),
                 "{value:?}"
             );
         }
@@ -68,10 +68,10 @@ mod tests {
         for (value, actual) in [(&[][..], 0), (&[1, 2][..], 2), (&[1, 2, 3, 4][..], 4)] {
             assert_eq!(
                 ExactLength::<3>.validate(value),
-                Err(vec![ExactLengthError {
+                Err(ValidationErrors::single(ExactLengthError {
                     expected: 3,
                     actual
-                }])
+                }))
             );
         }
 
@@ -83,10 +83,10 @@ mod tests {
         assert_eq!(ExactLength::<0>.validate(""), Ok(()));
         assert_eq!(ExactLength::<0>.validate(&[] as &[u8]), Ok(()));
 
-        let error = Err(vec![ExactLengthError {
+        let error = Err(ValidationErrors::single(ExactLengthError {
             expected: 0,
             actual: 1,
-        }]);
+        }));
 
         assert_eq!(ExactLength::<0>.validate("🦀"), error);
         assert_eq!(ExactLength::<0>.validate(&[1][..]), error);
