@@ -14,6 +14,8 @@ pub struct Model {
     pub runtime: Path,
     pub validator: Option<Type>,
     pub validator_with: Option<Expr>,
+    pub error: Option<Type>,
+    pub validators: Option<Vec<Type>>,
     pub deref: bool,
 }
 
@@ -68,12 +70,38 @@ impl Model {
             }
         }
 
+        if let Some(validators) = &options.validators {
+            if options.validator.is_some() || options.validator_with.is_some() {
+                return Err(syn::Error::new(
+                    validators[0].span(),
+                    "`validators(...)` cannot be combined with `validator` or `validator_with`",
+                ));
+            }
+            if options.error.is_none() {
+                return Err(syn::Error::new(
+                    validators[0].span(),
+                    "`validators(...)` requires `error = ErrorType`",
+                ));
+            }
+        }
+
         if options.validator.is_none()
+            && options.error.is_none()
             && let Some(construction) = &options.validator_with
         {
             return Err(syn::Error::new(
                 construction.span(),
-                "`validator_with` requires `validator = ValidatorType`",
+                "expression-only `validator_with` requires `error = ErrorType`",
+            ));
+        }
+        if options.validator.is_none()
+            && options.validator_with.is_none()
+            && options.validators.is_none()
+            && let Some(error) = &options.error
+        {
+            return Err(syn::Error::new(
+                error.span(),
+                "`error` requires a validator",
             ));
         }
 
@@ -83,6 +111,7 @@ impl Model {
                 "ValueObject cannot wrap a bare type parameter; implement ValueObject manually",
             ));
         }
+
         let runtime = resolve_runtime()?;
 
         Ok(Self {
@@ -92,8 +121,14 @@ impl Model {
             runtime,
             validator: options.validator,
             validator_with: options.validator_with,
+            error: options.error,
+            validators: options.validators,
             deref: options.deref.is_present(),
         })
+    }
+
+    pub fn is_validated(&self) -> bool {
+        self.validator.is_some() || self.validator_with.is_some() || self.validators.is_some()
     }
 
     pub fn helper_ident(&self, suffix: &str) -> Ident {
@@ -181,12 +216,55 @@ mod tests {
             assert!(parse(tokens).is_err());
         }
 
-        assert!(
-            parse(quote! {
-                #[value_object(validator = Check)]
+        for options in [
+            quote!(validator = Check),
+            quote!(validator = Check, error = DomainError),
+            quote!(validator = Check, validator_with = Check::new()),
+            quote!(
+                validator_with = checks::all!(First, Second),
+                error = DomainError
+            ),
+            quote!(validators(First, Second), error = DomainError),
+        ] {
+            let model = parse(quote! {
+                #[value_object(#options)]
                 struct Wrapper(String);
             })
-            .is_ok()
+            .unwrap();
+
+            assert!(model.is_validated());
+        }
+    }
+
+    #[test]
+    fn rejects_incomplete_and_conflicting_validation_options() {
+        for options in [
+            quote!(error = DomainError),
+            quote!(validators(Check)),
+            quote!(validators(Check), validator = Check, error = DomainError),
+            quote!(
+                validators(Check),
+                validator_with = Check::new(),
+                error = DomainError
+            ),
+        ] {
+            assert!(
+                parse(quote! {
+                    #[value_object(#options)]
+                    struct Wrapper(String);
+                })
+                .is_err(),
+                "accepted {options}"
+            );
+        }
+
+        assert!(
+            parse(quote! {
+                #[value_object(validators(Check), error = DomainError)]
+                #[value_object(validator_with = Check::new())]
+                struct Wrapper(String);
+            })
+            .is_err()
         );
     }
 

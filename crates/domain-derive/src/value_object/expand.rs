@@ -97,47 +97,151 @@ fn validation(
     view_type: &TokenStream,
     generics: &mut syn::Generics,
 ) -> (TokenStream, TokenStream) {
-    let Some(validator) = &model.validator else {
+    if !model.is_validated() {
         return (quote! { ::std::convert::Infallible }, TokenStream::new());
-    };
+    }
+
     let raw = &model.raw;
     let runtime = &model.runtime;
     let raw_ident = model.helper_ident("raw");
     let validator_ident = model.helper_ident("validator");
 
-    generics
-        .make_where_clause()
-        .predicates
-        .push(syn::parse_quote! {
-            #validator: #runtime::__private::Validator<#view_type>
-        });
+    let (validator, construction) = if let Some(validators) = &model.validators {
+        let (ty, expr) = lower_validators(model, validators, view_type, generics);
 
-    let construction = if let Some(construction) = &model.validator_with {
-        quote! { #construction }
+        (Some(ty), expr)
     } else {
+        let ty = model.validator.as_ref().map(|ty| quote! { #ty });
+        let expr = if let Some(expr) = &model.validator_with {
+            quote! { #expr }
+        } else {
+            let ty = ty.as_ref().expect("validated model has a validator");
+            generics
+                .make_where_clause()
+                .predicates
+                .push(syn::parse_quote! {
+                    #ty: ::std::default::Default
+                });
+
+            quote! { <#ty as ::std::default::Default>::default() }
+        };
+
+        (ty, expr)
+    };
+
+    if let Some(validator) = &validator {
         generics
             .make_where_clause()
             .predicates
             .push(syn::parse_quote! {
-                #validator: ::std::default::Default
+                #validator: #runtime::__private::Validator<#view_type>
             });
-        quote! { <#validator as ::std::default::Default>::default() }
+    }
+
+    let annotation = validator.as_ref().map(|ty| quote! { : #ty });
+    let error = if let Some(error) = &model.error {
+        generics
+            .make_where_clause()
+            .predicates
+            .push(syn::parse_quote! {
+                #error: ::std::error::Error
+            });
+
+        if let Some(validator) = &validator {
+            generics
+                .make_where_clause()
+                .predicates
+                .push(syn::parse_quote! {
+                    #error: ::std::convert::From<
+                        <#validator as #runtime::__private::Validator<#view_type>>::Error
+                    >
+                });
+        }
+
+        quote! { #error }
+    } else {
+        let validator = validator
+            .as_ref()
+            .expect("inferred validator has an explicit error");
+
+        quote! { <#validator as #runtime::__private::Validator<#view_type>>::Error }
     };
 
+    let mapping = model.error.as_ref().map(|error| {
+        quote! {
+            let #validator_ident = #runtime::__private::MapErr::new(
+                #validator_ident,
+                <#error as ::std::convert::From<_>>::from,
+            );
+        }
+    });
+
     (
+        quote! { #runtime::__private::ValidationErrors<#error> },
         quote! {
-            #runtime::__private::ValidationErrors<
-                <#validator as #runtime::__private::Validator<#view_type>>::Error
-            >
-        },
-        quote! {
-            let #validator_ident: #validator = #construction;
-            <#validator as #runtime::__private::Validator<#view_type>>::validate(
+            let #validator_ident #annotation = #construction;
+            #mapping
+            #runtime::__private::Validator::validate(
                 &#validator_ident,
                 <#raw as #runtime::AsView>::as_view(&#raw_ident),
             )?;
         },
     )
+}
+
+fn lower_validators(
+    model: &Model,
+    validators: &[syn::Type],
+    view_type: &TokenStream,
+    generics: &mut syn::Generics,
+) -> (TokenStream, TokenStream) {
+    let runtime = &model.runtime;
+    let error = model
+        .error
+        .as_ref()
+        .expect("validator list has an error type");
+
+    let mut mapped = validators
+        .iter()
+        .map(|validator| {
+            let predicates: [syn::WherePredicate; 2] = [
+                syn::parse_quote! {
+                    #validator: #runtime::__private::Validator<#view_type> + ::std::default::Default
+                },
+                syn::parse_quote! {
+                    #error: ::std::convert::From<
+                        <#validator as #runtime::__private::Validator<#view_type>>::Error
+                    >
+                },
+            ];
+            generics.make_where_clause().predicates.extend(predicates);
+
+            let source_error = quote! {
+                <#validator as #runtime::__private::Validator<#view_type>>::Error
+            };
+            let mapper = quote! { fn(#source_error) -> #error };
+            (
+                quote! { #runtime::__private::MapErr<#validator, #mapper> },
+                quote! {
+                    #runtime::__private::MapErr::new(
+                        <#validator as ::std::default::Default>::default(),
+                        <#error as ::std::convert::From<#source_error>>::from as #mapper,
+                    )
+                },
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let mut result = mapped.pop().expect("validator list is nonempty");
+    while let Some((ty, expr)) = mapped.pop() {
+        let (rest_ty, rest_expr) = result;
+        result = (
+            quote! { #runtime::__private::And<#ty, #rest_ty> },
+            quote! { #runtime::__private::And::new(#expr, #rest_expr) },
+        );
+    }
+
+    result
 }
 
 fn construction(model: &Model, generics: &syn::Generics) -> (TokenStream, TokenStream) {
@@ -152,7 +256,7 @@ fn construction(model: &Model, generics: &syn::Generics) -> (TokenStream, TokenS
     let error_ident = model.helper_ident("error");
     let value_ident = model.helper_ident("value");
 
-    if model.validator.is_some() {
+    if model.is_validated() {
         (
             quote! {
                 pub fn try_new(#raw_ident: impl ::std::convert::Into<#raw>) -> ::std::result::Result<Self, <Self as #runtime::ValueObject>::Error> {
@@ -228,8 +332,14 @@ mod tests {
             quote! { u32 },
             quote! { custom::Storage },
         ] {
-            for validated in [false, true] {
-                let validation = validated.then(|| quote! { validator = Check, });
+            for validation in [
+                quote! {},
+                quote! { validator = Check },
+                quote! { validator = Check, error = DomainError },
+                quote! { validator_with = Check::new(), error = DomainError },
+                quote! { validators(First, Second), error = DomainError },
+            ] {
+                let validated = !validation.is_empty();
                 let (methods, traits) = generated_api(quote! {
                     #[value_object(#validation)]
                     struct Wrapper(#raw);

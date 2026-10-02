@@ -11,7 +11,7 @@ pub use value_object::{AsView, ValueObject};
 
 #[doc(hidden)]
 pub mod __private {
-    pub use alternate_validation::{ValidationErrors, Validator};
+    pub use alternate_validation::{And, MapErr, ValidationErrors, Validator};
 }
 
 mod aggregate_root;
