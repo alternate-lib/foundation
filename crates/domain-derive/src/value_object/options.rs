@@ -15,6 +15,8 @@ pub struct Options {
     pub validators: Option<Vec<Type>>,
     #[darling(with = crate::attributes::parse_flag)]
     pub deref: Flag,
+    #[darling(with = crate::attributes::parse_flag)]
+    pub from_str: Flag,
 }
 
 impl Options {
@@ -167,11 +169,12 @@ mod tests {
         let options = parse(quote! {
             #[allow(dead_code)]
             #[value_object(validator = Check)]
-            #[value_object(validator_with = Check::new(), deref)]
+            #[value_object(validator_with = Check::new(), deref, from_str)]
             struct Wrapper(String);
         })
         .unwrap();
 
+        assert!(options.from_str.is_present());
         assert!(options.validator.is_some());
         assert!(options.validator_with.is_some());
         assert!(options.deref.is_present());
@@ -181,6 +184,7 @@ mod tests {
         assert!(options.validator.is_none());
         assert!(options.validator_with.is_none());
         assert!(!options.deref.is_present());
+        assert!(!options.from_str.is_present());
     }
 
     #[test]
@@ -189,6 +193,8 @@ mod tests {
             quote!(unknown),
             quote!(deref = true),
             quote!(deref()),
+            quote!(from_str = true),
+            quote!(from_str()),
             quote!(validator),
             quote!(validator = "Check"),
             quote!(validator = Check()),
@@ -220,6 +226,7 @@ mod tests {
             quote!(validator = Check),
             quote!(validator_with = Check::new()),
             quote!(deref),
+            quote!(from_str),
             quote!(error = Error),
             quote!(validators(Check)),
         ] {

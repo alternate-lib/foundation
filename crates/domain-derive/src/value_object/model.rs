@@ -17,6 +17,7 @@ pub struct Model {
     pub error: Option<Type>,
     pub validators: Option<Vec<Type>>,
     pub deref: bool,
+    pub from_str: bool,
 }
 
 impl Model {
@@ -124,6 +125,7 @@ impl Model {
             error: options.error,
             validators: options.validators,
             deref: options.deref.is_present(),
+            from_str: options.from_str.is_present(),
         })
     }
 

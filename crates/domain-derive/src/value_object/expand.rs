@@ -1,4 +1,4 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 
 use super::model::Model;
@@ -33,6 +33,31 @@ pub fn expand(model: &Model) -> TokenStream {
     let (error, validate) = validation(model, &view_type, &mut vo_generics);
     let (vo_impl_generics, _, vo_where_clause) = vo_generics.split_for_impl();
     let (constructor, conversion) = construction(model, &vo_generics);
+
+    let from_str = model.from_str.then(|| {
+        let mut generics = vo_generics.clone();
+        let lifetime = syn::Lifetime::new(
+            &format!("'{}", model.helper_ident("input")),
+            Span::mixed_site(),
+        );
+
+        generics.make_where_clause().predicates.push(syn::parse_quote! {
+            #raw: #runtime::AsView<View = str> + for<#lifetime> ::std::convert::From<&#lifetime str>
+        });
+        let (impl_generics, _, where_clause) = generics.split_for_impl();
+
+        quote! {
+            impl #impl_generics ::std::str::FromStr for #ident #type_generics #where_clause {
+                type Err = <Self as #runtime::ValueObject>::Error;
+
+                fn from_str(#raw_ident: &str) -> ::std::result::Result<Self, Self::Err> {
+                    <Self as #runtime::ValueObject>::try_new(
+                        <#raw as ::std::convert::From<&str>>::from(#raw_ident),
+                    )
+                }
+            }
+        }
+    });
 
     let deref = model.deref.then(|| {
         quote! {
@@ -82,6 +107,7 @@ pub fn expand(model: &Model) -> TokenStream {
         }
 
         #conversion
+        #from_str
         #deref
 
         impl #impl_generics ::std::convert::AsRef<#view_type> for #ident #type_generics #where_clause {
@@ -323,6 +349,18 @@ mod tests {
             }
         }
         (methods, traits)
+    }
+
+    #[test]
+    fn generates_from_str_only_when_opted_in() {
+        for validation in [quote! {}, quote! { validator = Check, }] {
+            let (_, traits) = generated_api(quote! {
+                #[value_object(#validation from_str)]
+                struct Wrapper(String);
+            });
+
+            assert!(traits.iter().any(|name| name == "FromStr"));
+        }
     }
 
     #[test]
